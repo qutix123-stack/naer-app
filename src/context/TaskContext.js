@@ -12,6 +12,7 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
+  getDoc,
 } from "firebase/firestore";
 
 import {
@@ -27,6 +28,8 @@ import {
 } from "../firebaseConfig";
 
 import * as Location from "expo-location";
+
+import sendPushNotification from "../sendPushNotification";
 
 export const TaskContext =
   createContext();
@@ -155,7 +158,6 @@ export function TaskProvider({
       task
     ) => {
       try {
-        // 🔥 VALIDATION
         if (
           !task.title?.trim()
         ) {
@@ -179,7 +181,6 @@ export function TaskProvider({
         let imageUrl =
           "";
 
-        // 🔥 IMAGE
         if (
           task.image
         ) {
@@ -189,7 +190,6 @@ export function TaskProvider({
             );
         }
 
-        // 🔥 SAVE TASK
         await addDoc(
           collection(
             db,
@@ -222,10 +222,20 @@ export function TaskProvider({
               task.urgent ||
               false,
 
+            category:
+              task.category ||
+              "Annet",
+
             accepted:
               false,
 
+            status:
+              "open",
+
             acceptedBy:
+              null,
+
+            acceptedById:
               null,
 
             helperLatitude:
@@ -247,12 +257,9 @@ export function TaskProvider({
 
               null,
 
-            ownerEmail:
-              auth
-                .currentUser
-                ?.email ||
-
-              "Unknown",
+            creatorName:
+              task.creatorName ||
+              "Bruker",
 
             createdAt:
               serverTimestamp(),
@@ -266,7 +273,8 @@ export function TaskProvider({
   // 🔥 ACCEPT TASK
   const acceptTask =
     async (
-      taskId
+      taskId,
+      helperName
     ) => {
       try {
         if (
@@ -324,12 +332,12 @@ export function TaskProvider({
             accepted:
               true,
 
-            acceptedBy:
-              auth
-                .currentUser
-                ?.email ||
+            status:
+              "accepted",
 
-              "Unknown",
+            acceptedBy:
+              helperName ||
+              "Hjelper",
 
             acceptedById:
               auth
@@ -355,6 +363,47 @@ export function TaskProvider({
               serverTimestamp(),
           }
         );
+
+        // 🔥 SEND PUSH
+        const taskDoc =
+          await getDoc(
+            doc(
+              db,
+              "tasks",
+              taskId
+            )
+          );
+
+        const taskData =
+          taskDoc.data();
+
+        if (
+          taskData?.createdBy
+        ) {
+          const userDoc =
+            await getDoc(
+              doc(
+                db,
+                "users",
+                taskData.createdBy
+              )
+            );
+
+          const userData =
+            userDoc.data();
+
+          if (
+            userData?.pushToken
+          ) {
+            await sendPushNotification(
+              userData.pushToken,
+
+              "🎉 Oppdrag akseptert",
+
+              `${helperName} vil hjelpe deg`
+            );
+          }
+        }
 
         // 🔥 LIVE TRACKING
         const subscription =
@@ -425,6 +474,9 @@ export function TaskProvider({
             completed:
               true,
 
+            status:
+              "completed",
+
             trackingActive:
               false,
 
@@ -449,6 +501,111 @@ export function TaskProvider({
             taskId
           ];
         }
+
+        // 🔥 PUSH
+        const taskDoc =
+          await getDoc(
+            doc(
+              db,
+              "tasks",
+              taskId
+            )
+          );
+
+        const taskData =
+          taskDoc.data();
+
+        if (
+          taskData?.createdBy
+        ) {
+          const userDoc =
+            await getDoc(
+              doc(
+                db,
+                "users",
+                taskData.createdBy
+              )
+            );
+
+          const userData =
+            userDoc.data();
+
+          if (
+            userData?.pushToken
+          ) {
+            await sendPushNotification(
+              userData.pushToken,
+
+              "✅ Oppdrag fullført",
+
+              "Oppdraget ditt ble fullført"
+            );
+          }
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    };
+
+  // 🔥 UPDATE TASK STATUS
+  const updateTaskStatus =
+    async (
+      taskId,
+      status
+    ) => {
+      try {
+        await updateDoc(
+          doc(
+            db,
+            "tasks",
+            taskId
+          ),
+
+          {
+            status,
+          }
+        );
+
+        // 🔥 PUSH
+        const taskDoc =
+          await getDoc(
+            doc(
+              db,
+              "tasks",
+              taskId
+            )
+          );
+
+        const taskData =
+          taskDoc.data();
+
+        if (
+          taskData?.createdBy
+        ) {
+          const userDoc =
+            await getDoc(
+              doc(
+                db,
+                "users",
+                taskData.createdBy
+              )
+            );
+
+          const userData =
+            userDoc.data();
+
+          if (
+            userData?.pushToken
+          ) {
+            await sendPushNotification(
+              userData.pushToken,
+
+              "📍 Oppdrag oppdatert",
+
+              `Status: ${status}`
+            );
+          }
+        }
       } catch (e) {
         console.log(e);
       }
@@ -466,6 +623,8 @@ export function TaskProvider({
         acceptTask,
 
         completeTask,
+
+        updateTaskStatus,
       }}
     >
       {children}

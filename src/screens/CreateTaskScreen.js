@@ -20,6 +20,50 @@ import * as ImagePicker from "expo-image-picker";
 
 import * as Location from "expo-location";
 
+import { auth } from "../firebaseConfig";
+
+const categories = [
+  {
+    label: "🚚 Flytting",
+    value: "Flytting",
+  },
+
+  {
+    label: "🧹 Rengjøring",
+    value: "Rengjøring",
+  },
+
+  {
+    label: "💻 IT",
+    value: "IT",
+  },
+
+  {
+    label: "🛒 Handling",
+    value: "Handling",
+  },
+
+  {
+    label: "🌳 Hage",
+    value: "Hage",
+  },
+
+  {
+    label: "📦 Bæring",
+    value: "Bæring",
+  },
+
+  {
+    label: "🐶 Dyrepass",
+    value: "Dyrepass",
+  },
+
+  {
+    label: "🔧 Annet",
+    value: "Annet",
+  },
+];
+
 export default function CreateTaskScreen({
   navigation,
 }) {
@@ -38,6 +82,9 @@ export default function CreateTaskScreen({
   const [loading, setLoading] =
     useState(false);
 
+  const [category, setCategory] =
+    useState("Annet");
+
   const { addTask } =
     useContext(TaskContext);
 
@@ -49,7 +96,7 @@ export default function CreateTaskScreen({
           await ImagePicker.launchImageLibraryAsync(
             {
               mediaTypes:
-                ImagePicker.MediaTypeOptions.Images,
+                ImagePicker.MediaType.Images,
 
               allowsEditing: true,
 
@@ -80,7 +127,6 @@ export default function CreateTaskScreen({
   const handleCreateTask =
     async () => {
       try {
-        // 🔥 VALIDATION
         if (
           !title.trim()
         ) {
@@ -158,6 +204,15 @@ export default function CreateTaskScreen({
           latitude,
 
           longitude,
+
+          category,
+
+          creatorName:
+            auth
+              .currentUser
+              ?.displayName ||
+
+            "Bruker",
         });
 
         // 🔥 RESET
@@ -173,7 +228,10 @@ export default function CreateTaskScreen({
           null
         );
 
-        // 🔥 SUCCESS
+        setCategory(
+          "Annet"
+        );
+
         Alert.alert(
           "Oppdrag publisert 🔥"
         );
@@ -283,7 +341,80 @@ export default function CreateTaskScreen({
         Opprett oppdrag
       </Text>
 
-      {/* TASK TITLE */}
+      {/* CATEGORY */}
+      <Text
+        style={{
+          fontSize: 18,
+
+          marginBottom: 14,
+
+          color:
+            "#374151",
+        }}
+      >
+        Kategori
+      </Text>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={
+          false
+        }
+        style={{
+          marginBottom: 28,
+        }}
+      >
+        {categories.map(
+          (
+            item
+          ) => (
+            <TouchableOpacity
+              key={
+                item.value
+              }
+              onPress={() =>
+                setCategory(
+                  item.value
+                )
+              }
+              style={{
+                backgroundColor:
+                  category ===
+                  item.value
+                    ? "#2563EB"
+                    : "white",
+
+                paddingHorizontal: 18,
+
+                paddingVertical: 14,
+
+                borderRadius: 20,
+
+                marginRight: 12,
+              }}
+            >
+              <Text
+                style={{
+                  color:
+                    category ===
+                    item.value
+                      ? "white"
+                      : "#111827",
+
+                  fontWeight:
+                    "bold",
+                }}
+              >
+                {
+                  item.label
+                }
+              </Text>
+            </TouchableOpacity>
+          )
+        )}
+      </ScrollView>
+
+      {/* TITLE */}
       <Text
         style={{
           fontSize: 18,

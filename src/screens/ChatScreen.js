@@ -14,6 +14,7 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  deleteDoc,
 } from "firebase/firestore";
 
 import { db, auth } from "../firebaseConfig";
@@ -27,6 +28,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 
 export default function ChatScreen({
@@ -47,8 +49,105 @@ export default function ChatScreen({
   const [loading, setLoading] =
     useState(true);
 
+  const [onlineUsers, setOnlineUsers] =
+    useState({});
+
+  const [blockedUsers, setBlockedUsers] =
+    useState([]);
+
   const flatListRef =
     useRef();
+
+  // 🔥 UPDATE ONLINE STATUS
+  useEffect(() => {
+    const setOnline =
+      async () => {
+        try {
+          await updateDoc(
+            doc(
+              db,
+              "users",
+              auth
+                .currentUser
+                ?.uid
+            ),
+
+            {
+              online: true,
+
+              lastSeen:
+                Date.now(),
+            }
+          );
+        } catch (e) {
+          console.log(
+            e
+          );
+        }
+      };
+
+    setOnline();
+
+    return async () => {
+      try {
+        await updateDoc(
+          doc(
+            db,
+            "users",
+            auth
+              .currentUser
+              ?.uid
+          ),
+
+          {
+            online: false,
+
+            lastSeen:
+              Date.now(),
+          }
+        );
+      } catch (e) {
+        console.log(
+          e
+        );
+      }
+    };
+  }, []);
+
+  // 🔥 LISTEN USERS
+  useEffect(() => {
+    const unsubscribe =
+      onSnapshot(
+        collection(
+          db,
+          "users"
+        ),
+
+        (
+          snapshot
+        ) => {
+          const users =
+            {};
+
+          snapshot.docs.forEach(
+            (
+              document
+            ) => {
+              users[
+                document.id
+              ] =
+                document.data();
+            }
+          );
+
+          setOnlineUsers(
+            users
+          );
+        }
+      );
+
+    return unsubscribe;
+  }, []);
 
   // 🔥 REALTIME MESSAGES
   useEffect(() => {
@@ -228,6 +327,12 @@ export default function ChatScreen({
                 .currentUser
                 ?.email,
 
+            senderName:
+              auth.currentUser?.email?.split(
+                "@"
+              )[0] ||
+              "Bruker",
+
             senderId:
               auth
                 .currentUser
@@ -240,7 +345,6 @@ export default function ChatScreen({
           }
         );
 
-        // 🔥 RESET TYPING
         await setDoc(
           doc(
             db,
@@ -302,33 +406,26 @@ export default function ChatScreen({
       }
     };
 
-  // 🔥 TIME FORMAT
-  const formatTime = (
-    timestamp
-  ) => {
-    if (!timestamp)
-      return "";
-
-    const time =
-      timestamp?.seconds
-        ? timestamp.seconds *
-          1000
-        : timestamp;
-
-    return new Date(
-      time
-    ).toLocaleTimeString(
-      [],
-
-      {
-        hour:
-          "2-digit",
-
-        minute:
-          "2-digit",
+  // 🔥 DELETE MESSAGE
+  const deleteMessage =
+    async (
+      messageId
+    ) => {
+      try {
+        await deleteDoc(
+          doc(
+            db,
+            "messages",
+            messageId
+          )
+        );
       }
-    );
-  };
+      catch (e) {
+  console.log(
+    e
+  );
+}
+    };
 
   // 🔥 LOADING
   if (loading) {
@@ -375,7 +472,13 @@ export default function ChatScreen({
         Platform.OS ===
         "ios"
           ? "padding"
-          : undefined
+          : "height"
+      }
+      keyboardVerticalOffset={
+        Platform.OS ===
+        "ios"
+          ? 120
+          : 100
       }
     >
       <View
@@ -386,19 +489,58 @@ export default function ChatScreen({
             "#F4F6F8",
         }}
       >
+        {/* HEADER */}
+        <View
+          style={{
+            paddingTop: 60,
+
+            paddingHorizontal: 20,
+
+            paddingBottom: 18,
+
+            backgroundColor:
+              "white",
+
+            borderBottomWidth: 1,
+
+            borderBottomColor:
+              "#E5E7EB",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 24,
+
+              fontWeight:
+                "bold",
+
+              color:
+                "#111827",
+            }}
+          >
+            {task.creatorName ||
+              "Chat"}
+          </Text>
+        </View>
+
         {/* MESSAGES */}
         <FlatList
           ref={flatListRef}
-          data={messages}
+          data={messages.filter(
+            (
+              msg
+            ) =>
+              !blockedUsers.includes(
+                msg.senderId
+              )
+          )}
           keyExtractor={(
             item
           ) => item.id}
           contentContainerStyle={{
             padding: 20,
 
-            paddingTop: 60,
-
-            paddingBottom: 20,
+            paddingBottom: 180,
           }}
           showsVerticalScrollIndicator={
             false
@@ -406,7 +548,15 @@ export default function ChatScreen({
           renderItem={({
             item,
           }) => (
-            <View
+            <TouchableOpacity
+              activeOpacity={
+                0.8
+              }
+              onLongPress={() =>
+                handleLongPress(
+                  item
+                )
+              }
               style={{
                 backgroundColor:
                   item.senderId ===
@@ -434,6 +584,28 @@ export default function ChatScreen({
                   "80%",
               }}
             >
+              <Text
+                style={{
+                  fontSize: 12,
+
+                  marginBottom: 4,
+
+                  fontWeight:
+                    "bold",
+
+                  color:
+                    item.senderId ===
+                    auth
+                      .currentUser
+                      ?.uid
+                      ? "#DCEBFF"
+                      : "#6B7280",
+                }}
+              >
+                {item.senderName ||
+                  "Bruker"}
+              </Text>
+
               <Text
                 style={{
                   color:
@@ -480,7 +652,7 @@ export default function ChatScreen({
                   </Text>
                 )}
               </Text>
-            </View>
+            </TouchableOpacity>
           )}
         />
 
@@ -508,7 +680,7 @@ export default function ChatScreen({
                 "#6B7280",
             }}
           >
-            skriver...
+            ✍️ skriver...
           </Text>
         )}
 
@@ -519,6 +691,12 @@ export default function ChatScreen({
               "row",
 
             padding: 12,
+
+            paddingBottom:
+              Platform.OS ===
+              "ios"
+                ? 110
+                : 130,
 
             backgroundColor:
               "white",

@@ -1,441 +1,730 @@
 import React, {
-  createContext,
+  useContext,
   useEffect,
   useState,
   useRef,
 } from "react";
 
-import {
-  collection,
-  onSnapshot,
-  addDoc,
-  updateDoc,
-  doc,
-  serverTimestamp,
-} from "firebase/firestore";
+import MapView, {
+  Marker,
+  Circle,
+} from "react-native-maps";
 
 import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 
-import {
-  db,
-  storage,
-  auth,
-} from "../firebaseConfig";
+import { TaskContext } from "../context/TaskContext";
 
 import * as Location from "expo-location";
 
-export const TaskContext =
-  createContext();
-
-export function TaskProvider({
-  children,
+export default function MapScreen({
+  navigation,
 }) {
-  const [tasks, setTasks] =
-    useState([]);
+  const { tasks } =
+    useContext(TaskContext);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [location, setLocation] =
+    useState(null);
 
-  // 🔥 TRACKING SUBSCRIPTIONS
-  const trackingSubscriptions =
-    useRef({});
+  const [selectedTask, setSelectedTask] =
+    useState(null);
 
-  // 🔥 REALTIME TASKS
+  const [locationDenied, setLocationDenied] =
+    useState(false);
+
+  const mapRef =
+    useRef(null);
+
+  // 🔥 LIVE USER LOCATION
   useEffect(() => {
-    const unsubscribe =
-      onSnapshot(
-        collection(
-          db,
-          "tasks"
-        ),
+    let subscription;
 
-        (snapshot) => {
-          const firestoreTasks =
-            snapshot.docs.map(
-              (document) => ({
-                id: document.id,
-                ...document.data(),
-              })
+    const getLocation =
+      async () => {
+        try {
+          const { status } =
+            await Location.requestForegroundPermissionsAsync();
+
+          console.log(
+            "LOCATION STATUS:",
+            status
+          );
+
+          if (
+            status !==
+            "granted"
+          ) {
+            setLocationDenied(
+              true
             );
 
-          setTasks(
-            firestoreTasks
-          );
+            return;
+          }
 
-          setLoading(
-            false
-          );
-        },
+          const currentLocation =
+            await Location.getCurrentPositionAsync(
+              {
+                accuracy:
+                  Location.Accuracy.Balanced,
+              }
+            );
 
-        (error) => {
+          if (
+            currentLocation?.coords
+          ) {
+            setLocation(
+              currentLocation.coords
+            );
+          }
+
+          subscription =
+            await Location.watchPositionAsync(
+              {
+                accuracy:
+                  Location.Accuracy.Balanced,
+
+                timeInterval: 5000,
+
+                distanceInterval: 10,
+              },
+
+              (
+                newLocation
+              ) => {
+                if (
+                  newLocation?.coords
+                ) {
+                  setLocation(
+                    newLocation.coords
+                  );
+                }
+              }
+            );
+        } catch (e) {
           console.log(
-            error
-          );
-
-          setLoading(
-            false
+            "MAP ERROR:",
+            e
           );
         }
-      );
+      };
+
+    getLocation();
 
     return () => {
-      unsubscribe();
-
-      // 🔥 CLEANUP ALL TRACKERS
-      Object.values(
-        trackingSubscriptions.current
-      ).forEach(
-        (subscription) => {
-          if (
-            subscription
-          ) {
-            subscription.remove();
-          }
-        }
-      );
+      if (
+        subscription
+      ) {
+        subscription.remove();
+      }
     };
   }, []);
 
-  // 🔥 IMAGE UPLOAD
-  const uploadImage =
-    async (
-      imageUri
-    ) => {
-      try {
-        if (!imageUri)
-          return "";
+  // 🔥 CENTER MAP
+  const centerMap =
+    () => {
+      if (
+        !location ||
+        !mapRef.current
+      )
+        return;
 
-        const response =
-          await fetch(
-            imageUri
-          );
+      mapRef.current.animateToRegion(
+        {
+          latitude:
+            Number(
+              location.latitude
+            ),
 
-        const blob =
-          await response.blob();
+          longitude:
+            Number(
+              location.longitude
+            ),
 
-        const filename = `task_${Date.now()}`;
+          latitudeDelta:
+            0.015,
 
-        const storageRef =
-          ref(
-            storage,
-            `tasks/${filename}`
-          );
+          longitudeDelta:
+            0.015,
+        },
 
-        await uploadBytes(
-          storageRef,
-          blob
-        );
+        1000
+      );
+    };
 
-        const downloadURL =
-          await getDownloadURL(
-            storageRef
-          );
+  // 🔥 STATUS COLORS
+  const getTaskColor =
+    (task) => {
+      switch (
+        task.status
+      ) {
+        case "accepted":
+          return "#F59E0B";
 
-        return downloadURL;
-      } catch (e) {
-        console.log(e);
+        case "on_the_way":
+          return "#2563EB";
 
-        return "";
+        case "arrived":
+          return "#8B5CF6";
+
+        case "working":
+          return "#EC4899";
+
+        case "completed":
+          return "#22C55E";
+
+        default:
+          return "#EF4444";
       }
     };
 
-  // 🔥 ADD TASK
-  const addTask =
-    async (
-      task
-    ) => {
-      try {
-        // 🔥 VALIDATION
-        if (
-          !task.title?.trim()
-        ) {
-          return console.log(
-            "Mangler tittel"
-          );
-        }
+  // 🔥 LOCATION DENIED
+  if (
+    locationDenied
+  ) {
+    return (
+      <View
+        style={{
+          flex: 1,
 
-        if (
-          !task.reward?.trim()
-        ) {
-          return console.log(
-            "Mangler reward"
-          );
-        }
+          justifyContent:
+            "center",
 
-        let imageUrl =
-          "";
+          alignItems:
+            "center",
 
-        // 🔥 IMAGE
-        if (
-          task.image
-        ) {
-          imageUrl =
-            await uploadImage(
-              task.image
-            );
-        }
+          backgroundColor:
+            "#F4F6F8",
 
-        // 🔥 SAVE TASK
-        await addDoc(
-          collection(
-            db,
-            "tasks"
-          ),
+          padding: 30,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 28,
 
-          {
-            title:
-              task.title.trim(),
+            marginBottom: 20,
+          }}
+        >
+          📍
+        </Text>
 
-            description:
-              task.description?.trim() ||
-              "",
+        <Text
+          style={{
+            fontSize: 22,
 
-            reward:
-              task.reward,
+            fontWeight:
+              "bold",
 
-            image:
-              imageUrl,
+            color:
+              "#111827",
 
-            latitude:
-              task.latitude ||
-              null,
+            textAlign:
+              "center",
+          }}
+        >
+          Location required
+        </Text>
 
-            longitude:
-              task.longitude ||
-              null,
+        <Text
+          style={{
+            marginTop: 12,
 
-            urgent:
-              task.urgent ||
-              false,
+            fontSize: 16,
 
-            accepted:
-              false,
+            color:
+              "#6B7280",
 
-            acceptedBy:
-              null,
+            textAlign:
+              "center",
 
-            helperLatitude:
-              null,
+            lineHeight: 24,
+          }}
+        >
+          Please enable GPS/location permissions to use the map.
+        </Text>
+      </View>
+    );
+  }
 
-            helperLongitude:
-              null,
+  // 🔥 LOADING
+  if (!location) {
+    return (
+      <View
+        style={{
+          flex: 1,
 
-            completed:
-              false,
+          justifyContent:
+            "center",
 
-            createdBy:
-              auth
-                .currentUser
-                ?.uid ||
+          alignItems:
+            "center",
 
-              null,
+          backgroundColor:
+            "#F4F6F8",
 
-            createdAt:
-              serverTimestamp(),
-          }
-        );
-      } catch (e) {
-        console.log(e);
-      }
-    };
+          padding: 30,
+        }}
+      >
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
+        />
 
-  // 🔥 ACCEPT TASK
-  const acceptTask =
-    async (
-      taskId
-    ) => {
-      try {
-        if (
-          !taskId
-        )
-          return;
+        <Text
+          style={{
+            marginTop: 20,
 
-        // 🔥 STOP OLD TRACKER
-        if (
-          trackingSubscriptions
-            .current[
-            taskId
-          ]
-        ) {
-          trackingSubscriptions.current[
-            taskId
-          ].remove();
-        }
+            fontSize: 18,
 
-        // 🔥 LOCATION PERMISSION
-        const {
-          status,
-        } =
-          await Location.requestForegroundPermissionsAsync();
+            fontWeight:
+              "bold",
 
-        if (
-          status !==
-          "granted"
-        ) {
-          console.log(
-            "Location denied"
-          );
+            color:
+              "#111827",
 
-          return;
-        }
+            textAlign:
+              "center",
+          }}
+        >
+          Waiting for location...
+        </Text>
 
-        // 🔥 GET LOCATION
-        const location =
-          await Location.getCurrentPositionAsync(
-            {
-              accuracy:
-                Location.Accuracy.High,
-            }
-          );
+        <Text
+          style={{
+            marginTop: 10,
 
-        // 🔥 UPDATE TASK
-        await updateDoc(
-          doc(
-            db,
-            "tasks",
-            taskId
-          ),
+            color:
+              "#6B7280",
 
-          {
-            accepted:
-              true,
-
-            acceptedBy:
-              auth
-                .currentUser
-                ?.email ||
-
-              "Unknown",
-
-            helperLatitude:
-              location
-                .coords
-                .latitude,
-
-            helperLongitude:
-              location
-                .coords
-                .longitude,
-
-            acceptedAt:
-              serverTimestamp(),
-          }
-        );
-
-        // 🔥 LIVE TRACKING
-        const subscription =
-          await Location.watchPositionAsync(
-            {
-              accuracy:
-                Location.Accuracy.High,
-
-              timeInterval: 5000,
-
-              distanceInterval: 5,
-            },
-
-            async (
-              newLocation
-            ) => {
-              try {
-                await updateDoc(
-                  doc(
-                    db,
-                    "tasks",
-                    taskId
-                  ),
-
-                  {
-                    helperLatitude:
-                      newLocation
-                        .coords
-                        .latitude,
-
-                    helperLongitude:
-                      newLocation
-                        .coords
-                        .longitude,
-                  }
-                );
-              } catch (e) {
-                console.log(
-                  e
-                );
-              }
-            }
-          );
-
-        // 🔥 SAVE TRACKER
-        trackingSubscriptions.current[
-          taskId
-        ] = subscription;
-      } catch (e) {
-        console.log(e);
-      }
-    };
-
-  // 🔥 COMPLETE TASK
-  const completeTask =
-    async (
-      taskId
-    ) => {
-      try {
-        await updateDoc(
-          doc(
-            db,
-            "tasks",
-            taskId
-          ),
-
-          {
-            completed:
-              true,
-
-            completedAt:
-              serverTimestamp(),
-          }
-        );
-
-        // 🔥 STOP TRACKING
-        if (
-          trackingSubscriptions
-            .current[
-            taskId
-          ]
-        ) {
-          trackingSubscriptions.current[
-            taskId
-          ].remove();
-
-          delete trackingSubscriptions
-            .current[
-            taskId
-          ];
-        }
-      } catch (e) {
-        console.log(e);
-      }
-    };
+            textAlign:
+              "center",
+          }}
+        >
+          Please allow GPS/location permissions
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <TaskContext.Provider
-      value={{
-        tasks,
+    <View style={styles.container}>
+      <MapView
+        ref={mapRef}
+        style={styles.map}
+        showsUserLocation
+        showsMyLocationButton
+        followsUserLocation
+        loadingEnabled
+        showsCompass
+        rotateEnabled
+        onPress={() =>
+          setSelectedTask(
+            null
+          )
+        }
+        onMapReady={() => {
+          if (
+            location &&
+            mapRef.current
+          ) {
+            setTimeout(() => {
+              mapRef.current.animateToRegion(
+                {
+                  latitude:
+                    Number(
+                      location.latitude
+                    ),
 
-        loading,
+                  longitude:
+                    Number(
+                      location.longitude
+                    ),
 
-        addTask,
+                  latitudeDelta:
+                    0.015,
 
-        acceptTask,
+                  longitudeDelta:
+                    0.015,
+                },
 
-        completeTask,
-      }}
-    >
-      {children}
-    </TaskContext.Provider>
+                1200
+              );
+            }, 500);
+          }
+        }}
+        initialRegion={{
+          latitude:
+            Number(
+              location.latitude
+            ),
+
+          longitude:
+            Number(
+              location.longitude
+            ),
+
+          latitudeDelta: 0.05,
+
+          longitudeDelta: 0.05,
+        }}
+      >
+        {/* USER RADIUS */}
+        {location &&
+          !isNaN(
+            Number(
+              location.latitude
+            )
+          ) &&
+          !isNaN(
+            Number(
+              location.longitude
+            )
+          ) && (
+            <Circle
+              center={{
+                latitude:
+                  Number(
+                    location.latitude
+                  ),
+
+                longitude:
+                  Number(
+                    location.longitude
+                  ),
+              }}
+              radius={80}
+              fillColor="rgba(37,99,235,0.12)"
+              strokeColor="rgba(37,99,235,0.35)"
+            />
+          )}
+
+        {/* TASK MARKERS */}
+        {tasks
+          .filter(
+            (task) =>
+              task &&
+              !isNaN(
+                Number(
+                  task.latitude
+                )
+              ) &&
+              !isNaN(
+                Number(
+                  task.longitude
+                )
+              )
+          )
+          .map(
+            (task) => (
+              <Marker
+                key={
+                  task.id
+                }
+                coordinate={{
+                  latitude:
+                    Number(
+                      task.latitude
+                    ),
+
+                  longitude:
+                    Number(
+                      task.longitude
+                    ),
+                }}
+                pinColor={getTaskColor(
+                  task
+                )}
+                onPress={() =>
+                  setSelectedTask(
+                    task
+                  )
+                }
+              />
+            )
+          )}
+      </MapView>
+
+      {/* TOP CARD */}
+      <View
+        style={
+          styles.statusCard
+        }
+      >
+        <Text
+          style={
+            styles.statusTitle
+          }
+        >
+          Live oppdrag
+        </Text>
+
+        <Text
+          style={
+            styles.statusText
+          }
+        >
+          {
+            tasks.filter(
+              (t) =>
+                !t.completed
+            ).length
+          } aktive oppdrag
+        </Text>
+      </View>
+
+      {/* MY LOCATION BUTTON */}
+      <TouchableOpacity
+        onPress={
+          centerMap
+        }
+        style={
+          styles.button
+        }
+      >
+        <Text
+          style={{
+            color:
+              "white",
+
+            fontWeight:
+              "bold",
+
+            fontSize: 16,
+          }}
+        >
+          📍
+        </Text>
+      </TouchableOpacity>
+
+      {/* BOTTOM SHEET */}
+      {selectedTask && (
+        <View
+          style={
+            styles.bottomSheet
+          }
+        >
+          <Text
+            style={
+              styles.taskTitle
+            }
+          >
+            {
+              selectedTask.title
+            }
+          </Text>
+
+          <Text
+            style={
+              styles.taskReward
+            }
+          >
+            💰{" "}
+            {
+              selectedTask.reward
+            }
+          </Text>
+
+          <Text
+            style={
+              styles.taskCategory
+            }
+          >
+            📂{" "}
+            {selectedTask.category ||
+              "Annet"}
+          </Text>
+
+          <TouchableOpacity
+            style={
+              styles.openButton
+            }
+            onPress={() =>
+              navigation.navigate(
+                "TaskDetail",
+                {
+                  task:
+                    selectedTask,
+                }
+              )
+            }
+          >
+            <Text
+              style={{
+                color:
+                  "white",
+
+                fontWeight:
+                  "bold",
+
+                fontSize: 16,
+              }}
+            >
+              Åpne oppdrag
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 }
+
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+
+    map: {
+      width: "100%",
+      height: "100%",
+    },
+
+    button: {
+      position:
+        "absolute",
+
+      bottom: 140,
+
+      right: 20,
+
+      backgroundColor:
+        "#111827",
+
+      width: 58,
+
+      height: 58,
+
+      borderRadius: 29,
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      elevation: 5,
+    },
+
+    statusCard: {
+      position:
+        "absolute",
+
+      top: 70,
+
+      left: 20,
+
+      right: 20,
+
+      backgroundColor:
+        "white",
+
+      padding: 18,
+
+      borderRadius: 24,
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.08,
+
+      shadowRadius: 10,
+
+      elevation: 4,
+    },
+
+    statusTitle: {
+      fontSize: 22,
+
+      fontWeight:
+        "bold",
+
+      color:
+        "#111827",
+
+      marginBottom: 6,
+    },
+
+    statusText: {
+      color:
+        "#6B7280",
+
+      fontSize: 16,
+    },
+
+    bottomSheet: {
+      position:
+        "absolute",
+
+      bottom: 25,
+
+      left: 20,
+
+      right: 20,
+
+      backgroundColor:
+        "white",
+
+      borderRadius: 28,
+
+      padding: 24,
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.12,
+
+      shadowRadius: 12,
+
+      elevation: 8,
+    },
+
+    taskTitle: {
+      fontSize: 24,
+
+      fontWeight:
+        "bold",
+
+      color:
+        "#111827",
+
+      marginBottom: 10,
+    },
+
+    taskReward: {
+      fontSize: 18,
+
+      color:
+        "#22C55E",
+
+      fontWeight:
+        "bold",
+
+      marginBottom: 8,
+    },
+
+    taskCategory: {
+      fontSize: 16,
+
+      color:
+        "#6B7280",
+
+      marginBottom: 20,
+    },
+
+    openButton: {
+      backgroundColor:
+        "#2563EB",
+
+      paddingVertical: 16,
+
+      borderRadius: 18,
+
+      alignItems:
+        "center",
+    },
+  });

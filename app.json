@@ -4,14 +4,35 @@
     "slug": "naer-app",
     "version": "1.0.0",
     "orientation": "portrait",
+
     "userInterfaceStyle": "light",
+
     "splash": {
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": ["**/*"],
+
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+
     "android": {
       "package": "com.naer.app"
+    },
+
+    "plugins": [
+      "expo-notifications"
+    ],
+
+    "notification": {
+      "icon": "./assets/icon.png",
+      "color": "#2563EB"
+    },
+
+    "extra": {
+      "eas": {
+        "projectId": "41c3bb48-ee73-471e-8053-688e1bf60b62"
+      }
     }
   }
 }

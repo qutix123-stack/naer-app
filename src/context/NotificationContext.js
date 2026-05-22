@@ -3,8 +3,6 @@ import React, {
   useState,
 } from "react";
 
-import * as Notifications from "expo-notifications";
-
 export const NotificationContext =
   createContext();
 

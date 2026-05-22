@@ -1,17 +1,293 @@
-import { View, Text } from "react-native";
+import React, {
+  useContext,
+} from "react";
 
-export default function MessagesScreen() {
+import {
+  View,
+  Text,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+} from "react-native";
+
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+
+import {
+  useEffect,
+  useState,
+} from "react";
+
+import { db, auth } from "../firebaseConfig";
+
+export default function MessagesScreen({
+  navigation,
+}) {
+  const [chatTasks, setChatTasks] =
+    useState([]);
+
+  // 🔥 LOAD CHATS
+  useEffect(() => {
+    const q = query(
+      collection(
+        db,
+        "tasks"
+      ),
+
+      where(
+        "accepted",
+        "==",
+        true
+      )
+    );
+
+    const unsubscribe =
+      onSnapshot(
+        q,
+
+        (
+          snapshot
+        ) => {
+          const loadedTasks =
+            snapshot.docs
+              .map(
+                (
+                  document
+                ) => ({
+                  id:
+                    document.id,
+
+                  ...document.data(),
+                })
+              )
+              .filter(
+                (
+                  task
+                ) =>
+                  task.createdBy ===
+                    auth
+                      .currentUser
+                      ?.uid ||
+
+                  task.acceptedById ===
+                    auth
+                      .currentUser
+                      ?.uid
+              );
+
+          setChatTasks(
+            loadedTasks
+          );
+        }
+      );
+
+    return unsubscribe;
+  }, []);
+
+  // 🔥 DELETE CHAT
+  const deleteChat =
+    async (
+      taskId
+    ) => {
+      try {
+        await deleteDoc(
+          doc(
+            db,
+            "tasks",
+            taskId
+          )
+        );
+      } catch (e) {
+        console.log(
+          e
+        );
+      }
+    };
+
+  // 🔥 LONG PRESS
+  const handleLongPress =
+    (
+      item
+    ) => {
+      Alert.alert(
+        "Slett chat",
+
+        "Vil du slette hele chatten?",
+
+        [
+          {
+            text:
+              "Avbryt",
+
+            style:
+              "cancel",
+          },
+
+          {
+            text:
+              "Slett",
+
+            style:
+              "destructive",
+
+            onPress:
+              () =>
+                deleteChat(
+                  item.id
+                ),
+          },
+        ]
+      );
+    };
+
   return (
     <View
       style={{
         flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
+
+        backgroundColor:
+          "#F4F6F8",
+
+        paddingTop: 60,
+
+        paddingHorizontal: 20,
       }}
     >
-      <Text style={{ fontSize: 30 }}>
+      <Text
+        style={{
+          fontSize: 34,
+
+          fontWeight:
+            "bold",
+
+          marginBottom: 30,
+
+          color:
+            "#111827",
+        }}
+      >
         Meldinger 💬
       </Text>
+
+      {chatTasks.length ===
+      0 ? (
+        <View
+          style={{
+            flex: 1,
+
+            justifyContent:
+              "center",
+
+            alignItems:
+              "center",
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 20,
+
+              color:
+                "#6B7280",
+
+              textAlign:
+                "center",
+            }}
+          >
+            Ingen aktive chats enda 😄
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={chatTasks}
+          keyExtractor={(
+            item
+          ) => item.id}
+          showsVerticalScrollIndicator={
+            false
+          }
+          renderItem={({
+            item,
+          }) => (
+            <TouchableOpacity
+              activeOpacity={
+                0.8
+              }
+              onPress={() =>
+                navigation.navigate(
+                  "Chat",
+
+                  {
+                    task:
+                      item,
+                  }
+                )
+              }
+              onLongPress={() =>
+                handleLongPress(
+                  item
+                )
+              }
+              style={{
+                backgroundColor:
+                  "white",
+
+                padding: 20,
+
+                borderRadius: 22,
+
+                marginBottom: 15,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 20,
+
+                  fontWeight:
+                    "bold",
+
+                  color:
+                    "#111827",
+
+                  marginBottom: 8,
+                }}
+              >
+                {item.title}
+              </Text>
+
+              <Text
+                style={{
+                  fontSize: 16,
+
+                  color:
+                    "#6B7280",
+
+                  marginBottom: 8,
+                }}
+              >
+                💰{" "}
+                {item.reward}
+              </Text>
+
+              <Text
+                style={{
+                  fontSize: 14,
+
+                  color:
+                    "#2563EB",
+                }}
+              >
+                Hold inne for å slette →
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
     </View>
   );
 }

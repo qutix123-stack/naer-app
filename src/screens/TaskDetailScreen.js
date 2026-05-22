@@ -100,6 +100,7 @@ export default function TaskDetailScreen({
   const {
     acceptTask,
     completeTask,
+    updateTaskStatus,
   } =
     useContext(
       TaskContext
@@ -267,6 +268,58 @@ export default function TaskDetailScreen({
     return `${days} dager siden`;
   };
 
+  // 🔥 STATUS COLORS
+  const getStatusColor =
+    () => {
+      switch (
+        task.status
+      ) {
+        case "accepted":
+          return "#F59E0B";
+
+        case "on_the_way":
+          return "#2563EB";
+
+        case "arrived":
+          return "#8B5CF6";
+
+        case "working":
+          return "#EC4899";
+
+        case "completed":
+          return "#22C55E";
+
+        default:
+          return "#EF4444";
+      }
+    };
+
+  // 🔥 STATUS TEXT
+  const getStatusText =
+    () => {
+      switch (
+        task.status
+      ) {
+        case "accepted":
+          return "Akseptert";
+
+        case "on_the_way":
+          return "På vei";
+
+        case "arrived":
+          return "Ankommet";
+
+        case "working":
+          return "Utføres";
+
+        case "completed":
+          return "Fullført";
+
+        default:
+          return "Åpen";
+      }
+    };
+
   // 🔥 HANDLE ACCEPT
   const handleAcceptTask =
     async () => {
@@ -276,7 +329,8 @@ export default function TaskDetailScreen({
         );
 
         await acceptTask(
-          task.id
+          task.id,
+          "Hjelper"
         );
 
         addNotification(
@@ -284,7 +338,8 @@ export default function TaskDetailScreen({
             title:
               "🎉 Noen vil hjelpe deg",
 
-            message: `${auth.currentUser.email} aksepterte oppdraget ditt`,
+            message:
+              "Oppdraget ditt ble akseptert",
 
             task,
           }
@@ -384,7 +439,6 @@ export default function TaskDetailScreen({
           }
         );
 
-        // 🔥 UPDATE USER
         if (
           task.acceptedById
         ) {
@@ -466,6 +520,37 @@ export default function TaskDetailScreen({
         />
       ) : null}
 
+      {/* STATUS */}
+      <View
+        style={{
+          backgroundColor:
+            getStatusColor(),
+
+          padding: 14,
+
+          borderRadius: 18,
+
+          alignSelf:
+            "flex-start",
+
+          marginBottom: 20,
+        }}
+      >
+        <Text
+          style={{
+            color:
+              "white",
+
+            fontWeight:
+              "bold",
+
+            fontSize: 16,
+          }}
+        >
+          {getStatusText()}
+        </Text>
+      </View>
+
       {/* TITLE */}
       <Text
         style={{
@@ -482,6 +567,38 @@ export default function TaskDetailScreen({
       >
         {task.title}
       </Text>
+
+      {/* CATEGORY */}
+      <View
+        style={{
+          backgroundColor:
+            "#EFF6FF",
+
+          paddingHorizontal: 14,
+
+          paddingVertical: 10,
+
+          borderRadius: 18,
+
+          alignSelf:
+            "flex-start",
+
+          marginBottom: 18,
+        }}
+      >
+        <Text
+          style={{
+            color:
+              "#2563EB",
+
+            fontWeight:
+              "bold",
+          }}
+        >
+          {task.category ||
+            "Annet"}
+        </Text>
+      </View>
 
       {/* REWARD */}
       <Text
@@ -529,106 +646,118 @@ export default function TaskDetailScreen({
         </Text>
       </View>
 
-      {/* INFO */}
-      <View
-        style={{
-          backgroundColor:
-            "white",
-
-          padding: 22,
-
-          borderRadius: 24,
-
-          marginBottom: 20,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 18,
-
-            marginBottom: 12,
-          }}
-        >
-          📍{" "}
-          {location &&
-          task.latitude !=
-            null &&
-          task.longitude !=
-            null
-            ? `${Math.round(
-                getDistance(
-                  location.latitude,
-                  location.longitude,
-                  task.latitude,
-                  task.longitude
-                ) * 1000
-              )} meter unna`
-            : "Ukjent avstand"}
-        </Text>
-
-        <Text
-          style={{
-            fontSize: 18,
-
-            marginBottom: 12,
-          }}
-        >
-          ⏱{" "}
-          {getTimeAgo(
-            task.createdAt
-          )}
-        </Text>
-
-        <Text
-          style={{
-            fontSize: 18,
-          }}
-        >
-          ⭐ Trusted helper
-        </Text>
-      </View>
-
-      {/* LIVE HELPER */}
-      {task.helperLatitude !=
-        null &&
-        task.helperLongitude !=
-          null && (
-          <View
-            style={{
-              backgroundColor:
-                "white",
-
-              padding: 22,
-
-              borderRadius: 24,
-
-              marginBottom: 20,
-            }}
-          >
-            <Text
+      {/* STATUS BUTTONS */}
+      {task.accepted &&
+        !task.completed && (
+          <>
+            <TouchableOpacity
+              onPress={() =>
+                updateTaskStatus(
+                  task.id,
+                  "on_the_way"
+                )
+              }
               style={{
-                fontSize: 20,
+                backgroundColor:
+                  "#2563EB",
 
-                fontWeight:
-                  "bold",
+                padding: 18,
 
-                marginBottom: 10,
+                borderRadius: 20,
+
+                alignItems:
+                  "center",
+
+                marginBottom: 14,
               }}
             >
-              🟢 Hjelper på vei
-            </Text>
+              <Text
+                style={{
+                  color:
+                    "white",
 
-            <Text
+                  fontSize: 18,
+
+                  fontWeight:
+                    "bold",
+                }}
+              >
+                På vei
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() =>
+                updateTaskStatus(
+                  task.id,
+                  "arrived"
+                )
+              }
               style={{
-                fontSize: 16,
+                backgroundColor:
+                  "#8B5CF6",
 
-                color:
-                  "#6B7280",
+                padding: 18,
+
+                borderRadius: 20,
+
+                alignItems:
+                  "center",
+
+                marginBottom: 14,
               }}
             >
-              Live tracking aktivert
-            </Text>
-          </View>
+              <Text
+                style={{
+                  color:
+                    "white",
+
+                  fontSize: 18,
+
+                  fontWeight:
+                    "bold",
+                }}
+              >
+                Ankommet
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() =>
+                updateTaskStatus(
+                  task.id,
+                  "working"
+                )
+              }
+              style={{
+                backgroundColor:
+                  "#EC4899",
+
+                padding: 18,
+
+                borderRadius: 20,
+
+                alignItems:
+                  "center",
+
+                marginBottom: 14,
+              }}
+            >
+              <Text
+                style={{
+                  color:
+                    "white",
+
+                  fontSize: 18,
+
+                  fontWeight:
+                    "bold",
+                }}
+              >
+                Utfører oppdrag
+              </Text>
+            </TouchableOpacity>
+          </>
         )}
 
       {/* USER */}
@@ -654,7 +783,7 @@ export default function TaskDetailScreen({
             marginBottom: 10,
           }}
         >
-          {task.ownerEmail ||
+          {task.creatorName ||
             "Bruker"}
         </Text>
 
@@ -672,11 +801,7 @@ export default function TaskDetailScreen({
 
       {/* ACCEPT */}
       {!task.accepted &&
-        !task.completed &&
-        task.ownerId !==
-          auth
-            .currentUser
-            ?.uid && (
+        !task.completed && (
           <TouchableOpacity
             disabled={
               loading
@@ -730,7 +855,7 @@ export default function TaskDetailScreen({
             }
             style={{
               backgroundColor:
-                "#2563EB",
+                "#22C55E",
 
               padding: 22,
 
@@ -761,102 +886,6 @@ export default function TaskDetailScreen({
             )}
           </TouchableOpacity>
         )}
-
-      {/* REVIEW */}
-      {showReview && (
-        <View
-          style={{
-            backgroundColor:
-              "white",
-
-            padding: 22,
-
-            borderRadius: 24,
-
-            marginBottom: 20,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 24,
-
-              fontWeight:
-                "bold",
-
-              marginBottom: 20,
-            }}
-          >
-            Gi vurdering ⭐
-          </Text>
-
-          <TextInput
-            value={
-              review
-            }
-            onChangeText={
-              setReview
-            }
-            placeholder="Hvordan gikk oppdraget?"
-            multiline
-            maxLength={
-              300
-            }
-            style={{
-              backgroundColor:
-                "#F3F4F6",
-
-              padding: 16,
-
-              borderRadius: 18,
-
-              minHeight: 120,
-
-              marginBottom: 20,
-
-              textAlignVertical:
-                "top",
-            }}
-          />
-
-          <TouchableOpacity
-            disabled={
-              loading
-            }
-            onPress={
-              submitReview
-            }
-            style={{
-              backgroundColor:
-                "#22C55E",
-
-              padding: 18,
-
-              borderRadius: 20,
-
-              alignItems:
-                "center",
-            }}
-          >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text
-                style={{
-                  color:
-                    "white",
-
-                  fontSize: 18,
-
-                  fontWeight:
-                    "bold",
-                }}
-              >
-                Send vurdering
-              </Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* MAPS */}
       <TouchableOpacity
