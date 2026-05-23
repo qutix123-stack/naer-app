@@ -17,7 +17,18 @@
     ],
 
     "android": {
-      "package": "com.naer.app"
+      "package": "com.naer.app",
+
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyB9WovNfpDfF_lCSGR2-her8uhmhWutP54"
+        }
+      }
     },
 
     "plugins": [

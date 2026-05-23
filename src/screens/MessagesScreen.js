@@ -1,6 +1,4 @@
-import React, {
-  useContext,
-} from "react";
+import React from "react";
 
 import {
   View,
@@ -8,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 
 import {
@@ -32,62 +31,106 @@ export default function MessagesScreen({
   const [chatTasks, setChatTasks] =
     useState([]);
 
+  const [loading, setLoading] =
+    useState(true);
+
   // 🔥 LOAD CHATS
   useEffect(() => {
-    const q = query(
-      collection(
-        db,
-        "tasks"
-      ),
+    try {
+      const q = query(
+        collection(
+          db,
+          "tasks"
+        ),
 
-      where(
-        "accepted",
-        "==",
-        true
-      )
-    );
-
-    const unsubscribe =
-      onSnapshot(
-        q,
-
-        (
-          snapshot
-        ) => {
-          const loadedTasks =
-            snapshot.docs
-              .map(
-                (
-                  document
-                ) => ({
-                  id:
-                    document.id,
-
-                  ...document.data(),
-                })
-              )
-              .filter(
-                (
-                  task
-                ) =>
-                  task.createdBy ===
-                    auth
-                      .currentUser
-                      ?.uid ||
-
-                  task.acceptedById ===
-                    auth
-                      .currentUser
-                      ?.uid
-              );
-
-          setChatTasks(
-            loadedTasks
-          );
-        }
+        where(
+          "accepted",
+          "==",
+          true
+        )
       );
 
-    return unsubscribe;
+      const unsubscribe =
+        onSnapshot(
+          q,
+
+          (
+            snapshot
+          ) => {
+            try {
+              const loadedTasks =
+                snapshot.docs
+                  .map(
+                    (
+                      document
+                    ) => ({
+                      id:
+                        document.id,
+
+                      ...document.data(),
+                    })
+                  )
+                  .filter(
+                    (
+                      task
+                    ) =>
+                      task &&
+                      task.id &&
+                      (
+                        task.createdBy ===
+                          auth
+                            .currentUser
+                            ?.uid ||
+
+                        task.acceptedById ===
+                          auth
+                            .currentUser
+                            ?.uid
+                      )
+                  );
+
+              setChatTasks(
+                loadedTasks
+              );
+
+              setLoading(
+                false
+              );
+            } catch (e) {
+              console.log(
+                "CHAT LOAD ERROR:",
+                e
+              );
+
+              setLoading(
+                false
+              );
+            }
+          },
+
+          (error) => {
+            console.log(
+              "SNAPSHOT ERROR:",
+              error
+            );
+
+            setLoading(
+              false
+            );
+          }
+        );
+
+      return unsubscribe;
+    } catch (e) {
+      console.log(
+        "MESSAGES ERROR:",
+        e
+      );
+
+      setLoading(
+        false
+      );
+    }
   }, []);
 
   // 🔥 DELETE CHAT
@@ -96,6 +139,9 @@ export default function MessagesScreen({
       taskId
     ) => {
       try {
+        if (!taskId)
+          return;
+
         await deleteDoc(
           doc(
             db,
@@ -105,6 +151,7 @@ export default function MessagesScreen({
         );
       } catch (e) {
         console.log(
+          "DELETE ERROR:",
           e
         );
       }
@@ -115,6 +162,13 @@ export default function MessagesScreen({
     (
       item
     ) => {
+      if (
+        !item ||
+        !item.id
+      ) {
+        return;
+      }
+
       Alert.alert(
         "Slett chat",
 
@@ -145,6 +199,42 @@ export default function MessagesScreen({
         ]
       );
     };
+
+  // 🔥 LOADING
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+
+          justifyContent:
+            "center",
+
+          alignItems:
+            "center",
+
+          backgroundColor:
+            "#F4F6F8",
+        }}
+      >
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
+        />
+
+        <Text
+          style={{
+            marginTop: 20,
+
+            color:
+              "#6B7280",
+          }}
+        >
+          Laster meldinger...
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -204,88 +294,123 @@ export default function MessagesScreen({
         </View>
       ) : (
         <FlatList
-          data={chatTasks}
+          data={
+            chatTasks ||
+            []
+          }
           keyExtractor={(
-            item
-          ) => item.id}
+            item,
+            index
+          ) =>
+            item?.id
+              ? item.id.toString()
+              : index.toString()
+          }
           showsVerticalScrollIndicator={
             false
           }
           renderItem={({
             item,
-          }) => (
-            <TouchableOpacity
-              activeOpacity={
-                0.8
-              }
-              onPress={() =>
-                navigation.navigate(
-                  "Chat",
+          }) => {
+            if (
+              !item ||
+              !item.id
+            ) {
+              return null;
+            }
 
-                  {
-                    task:
-                      item,
+            return (
+              <TouchableOpacity
+                activeOpacity={
+                  0.8
+                }
+                onPress={() => {
+                  try {
+                    navigation.navigate(
+                      "Chat",
+
+                      {
+                        task:
+                          item,
+                      }
+                    );
+                  } catch (e) {
+                    console.log(
+                      "CHAT NAV ERROR:",
+                      e
+                    );
                   }
-                )
-              }
-              onLongPress={() =>
-                handleLongPress(
-                  item
-                )
-              }
-              style={{
-                backgroundColor:
-                  "white",
-
-                padding: 20,
-
-                borderRadius: 22,
-
-                marginBottom: 15,
-              }}
-            >
-              <Text
+                }}
+                onLongPress={() =>
+                  handleLongPress(
+                    item
+                  )
+                }
                 style={{
-                  fontSize: 20,
+                  backgroundColor:
+                    "white",
 
-                  fontWeight:
-                    "bold",
+                  padding: 20,
 
-                  color:
-                    "#111827",
+                  borderRadius: 22,
 
-                  marginBottom: 8,
+                  marginBottom: 15,
+
+                  shadowColor:
+                    "#000",
+
+                  shadowOpacity: 0.05,
+
+                  shadowRadius: 8,
+
+                  elevation: 3,
                 }}
               >
-                {item.title}
-              </Text>
+                <Text
+                  style={{
+                    fontSize: 20,
 
-              <Text
-                style={{
-                  fontSize: 16,
+                    fontWeight:
+                      "bold",
 
-                  color:
-                    "#6B7280",
+                    color:
+                      "#111827",
 
-                  marginBottom: 8,
-                }}
-              >
-                💰{" "}
-                {item.reward}
-              </Text>
+                    marginBottom: 8,
+                  }}
+                >
+                  {item.title ||
+                    "Ukjent oppdrag"}
+                </Text>
 
-              <Text
-                style={{
-                  fontSize: 14,
+                <Text
+                  style={{
+                    fontSize: 16,
 
-                  color:
-                    "#2563EB",
-                }}
-              >
-                Hold inne for å slette →
-              </Text>
-            </TouchableOpacity>
-          )}
+                    color:
+                      "#6B7280",
+
+                    marginBottom: 8,
+                  }}
+                >
+                  💰{" "}
+                  {item.reward ||
+                    "0 kr"}
+                </Text>
+
+                <Text
+                  style={{
+                    fontSize: 14,
+
+                    color:
+                      "#2563EB",
+                  }}
+                >
+                  Trykk for å åpne chat →
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
         />
       )}
     </View>

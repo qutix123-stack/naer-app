@@ -2,12 +2,10 @@ import React, {
   useContext,
   useEffect,
   useState,
-  useRef,
 } from "react";
 
 import MapView, {
   Marker,
-  Circle,
 } from "react-native-maps";
 
 import {
@@ -20,444 +18,133 @@ import {
 
 import { TaskContext } from "../context/TaskContext";
 
-import * as Location from "expo-location";
-
 export default function MapScreen({
   navigation,
 }) {
   const { tasks } =
     useContext(TaskContext);
 
-  const [location, setLocation] =
-    useState(null);
+  const [loading, setLoading] =
+    useState(true);
 
-  const [selectedTask, setSelectedTask] =
-    useState(null);
-
-  const [locationDenied, setLocationDenied] =
-    useState(false);
-
-  const mapRef =
-    useRef(null);
-
-  // 🔥 LIVE USER LOCATION
   useEffect(() => {
-    let subscription;
+    console.log(
+      "TASKS:",
+      tasks
+    );
 
-    const getLocation =
-      async () => {
-        try {
-          const { status } =
-            await Location.requestForegroundPermissionsAsync();
-
-          console.log(
-            "LOCATION STATUS:",
-            status
-          );
-
-          if (
-            status !==
-            "granted"
-          ) {
-            setLocationDenied(
-              true
-            );
-
-            return;
-          }
-
-          const currentLocation =
-            await Location.getCurrentPositionAsync(
-              {
-                accuracy:
-                  Location.Accuracy.Balanced,
-              }
-            );
-
-          if (
-            currentLocation?.coords
-          ) {
-            setLocation(
-              currentLocation.coords
-            );
-          }
-
-          subscription =
-            await Location.watchPositionAsync(
-              {
-                accuracy:
-                  Location.Accuracy.Balanced,
-
-                timeInterval: 5000,
-
-                distanceInterval: 10,
-              },
-
-              (
-                newLocation
-              ) => {
-                if (
-                  newLocation?.coords
-                ) {
-                  setLocation(
-                    newLocation.coords
-                  );
-                }
-              }
-            );
-        } catch (e) {
-          console.log(
-            "MAP ERROR:",
-            e
-          );
-        }
-      };
-
-    getLocation();
-
-    return () => {
-      if (
-        subscription
-      ) {
-        subscription.remove();
-      }
-    };
+    setTimeout(() => {
+      setLoading(false);
+    }, 1200);
   }, []);
 
-  // 🔥 CENTER MAP
-  const centerMap =
-    () => {
-      if (
-        !location ||
-        !mapRef.current
-      )
-        return;
+  // TEMP TEST DATA
+  const demoTasks = [
+    {
+      id: "1",
+      title: "Hjelp med sofa",
+      latitude: 59.9139,
+      longitude: 10.7522,
+    },
 
-      mapRef.current.animateToRegion(
-        {
-          latitude:
-            Number(
-              location.latitude
-            ),
+    {
+      id: "2",
+      title: "Handle mat",
+      latitude: 59.918,
+      longitude: 10.758,
+    },
 
-          longitude:
-            Number(
-              location.longitude
-            ),
+    {
+      id: "3",
+      title: "Hundepass",
+      latitude: 59.909,
+      longitude: 10.745,
+    },
 
-          latitudeDelta:
-            0.015,
-
-          longitudeDelta:
-            0.015,
-        },
-
-        1000
-      );
-    };
-
-  // 🔥 STATUS COLORS
-  const getTaskColor =
-    (task) => {
-      switch (
-        task.status
-      ) {
-        case "accepted":
-          return "#F59E0B";
-
-        case "on_the_way":
-          return "#2563EB";
-
-        case "arrived":
-          return "#8B5CF6";
-
-        case "working":
-          return "#EC4899";
-
-        case "completed":
-          return "#22C55E";
-
-        default:
-          return "#EF4444";
-      }
-    };
-
-  // 🔥 LOCATION DENIED
-  if (
-    locationDenied
-  ) {
-    return (
-      <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-
-          padding: 30,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 28,
-
-            marginBottom: 20,
-          }}
-        >
-          📍
-        </Text>
-
-        <Text
-          style={{
-            fontSize: 22,
-
-            fontWeight:
-              "bold",
-
-            color:
-              "#111827",
-
-            textAlign:
-              "center",
-          }}
-        >
-          Location required
-        </Text>
-
-        <Text
-          style={{
-            marginTop: 12,
-
-            fontSize: 16,
-
-            color:
-              "#6B7280",
-
-            textAlign:
-              "center",
-
-            lineHeight: 24,
-          }}
-        >
-          Please enable GPS/location permissions to use the map.
-        </Text>
-      </View>
-    );
-  }
-
-  // 🔥 LOADING
-  if (!location) {
-    return (
-      <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-
-          padding: 30,
-        }}
-      >
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text
-          style={{
-            marginTop: 20,
-
-            fontSize: 18,
-
-            fontWeight:
-              "bold",
-
-            color:
-              "#111827",
-
-            textAlign:
-              "center",
-          }}
-        >
-          Waiting for location...
-        </Text>
-
-        <Text
-          style={{
-            marginTop: 10,
-
-            color:
-              "#6B7280",
-
-            textAlign:
-              "center",
-          }}
-        >
-          Please allow GPS/location permissions
-        </Text>
-      </View>
-    );
-  }
+    {
+      id: "4",
+      title: "Bære TV",
+      latitude: 59.921,
+      longitude: 10.764,
+    },
+  ];
 
   return (
     <View style={styles.container}>
-      <MapView
-        ref={mapRef}
-        style={styles.map}
-        showsUserLocation
-        showsMyLocationButton
-        followsUserLocation
-        loadingEnabled
-        showsCompass
-        rotateEnabled
-        onPress={() =>
-          setSelectedTask(
-            null
-          )
-        }
-        onMapReady={() => {
-          if (
-            location &&
-            mapRef.current
-          ) {
-            setTimeout(() => {
-              mapRef.current.animateToRegion(
-                {
-                  latitude:
-                    Number(
-                      location.latitude
-                    ),
-
-                  longitude:
-                    Number(
-                      location.longitude
-                    ),
-
-                  latitudeDelta:
-                    0.015,
-
-                  longitudeDelta:
-                    0.015,
-                },
-
-                1200
-              );
-            }, 500);
+      {loading && (
+        <View
+          style={
+            styles.loadingContainer
           }
-        }}
+        >
+          <ActivityIndicator
+            size="large"
+            color="#2563EB"
+          />
+
+          <Text
+            style={
+              styles.loadingText
+            }
+          >
+            Laster kart...
+          </Text>
+        </View>
+      )}
+
+      <MapView
+        style={styles.map}
         initialRegion={{
-          latitude:
-            Number(
-              location.latitude
-            ),
-
-          longitude:
-            Number(
-              location.longitude
-            ),
-
+          latitude: 59.9139,
+          longitude: 10.7522,
           latitudeDelta: 0.05,
-
           longitudeDelta: 0.05,
         }}
+        mapType="standard"
+        loadingEnabled={false}
+        showsUserLocation={false}
+        showsMyLocationButton={
+          false
+        }
+        rotateEnabled={false}
+        pitchEnabled={false}
+        toolbarEnabled={false}
       >
-        {/* USER RADIUS */}
-        {location &&
-          !isNaN(
-            Number(
-              location.latitude
-            )
-          ) &&
-          !isNaN(
-            Number(
-              location.longitude
-            )
-          ) && (
-            <Circle
-              center={{
+        {demoTasks.map(
+          (task) => (
+            <Marker
+              key={task.id}
+              coordinate={{
                 latitude:
-                  Number(
-                    location.latitude
-                  ),
-
+                  task.latitude,
                 longitude:
-                  Number(
-                    location.longitude
-                  ),
+                  task.longitude,
               }}
-              radius={80}
-              fillColor="rgba(37,99,235,0.12)"
-              strokeColor="rgba(37,99,235,0.35)"
+              title={task.title}
+              description="Trykk for detaljer"
+              pinColor="#2563EB"
+              onPress={() =>
+                navigation.navigate(
+                  "TaskDetail",
+                  {
+                    task,
+                  }
+                )
+              }
             />
-          )}
-
-        {/* TASK MARKERS */}
-        {tasks
-          .filter(
-            (task) =>
-              task &&
-              !isNaN(
-                Number(
-                  task.latitude
-                )
-              ) &&
-              !isNaN(
-                Number(
-                  task.longitude
-                )
-              )
           )
-          .map(
-            (task) => (
-              <Marker
-                key={
-                  task.id
-                }
-                coordinate={{
-                  latitude:
-                    Number(
-                      task.latitude
-                    ),
-
-                  longitude:
-                    Number(
-                      task.longitude
-                    ),
-                }}
-                pinColor={getTaskColor(
-                  task
-                )}
-                onPress={() =>
-                  setSelectedTask(
-                    task
-                  )
-                }
-              />
-            )
-          )}
+        )}
       </MapView>
 
       {/* TOP CARD */}
       <View
         style={
-          styles.statusCard
+          styles.topCard
         }
       >
         <Text
           style={
-            styles.statusTitle
+            styles.title
           }
         >
           Live oppdrag
@@ -465,110 +152,35 @@ export default function MapScreen({
 
         <Text
           style={
-            styles.statusText
+            styles.subtitle
           }
         >
           {
-            tasks.filter(
-              (t) =>
-                !t.completed
-            ).length
-          } aktive oppdrag
+            demoTasks.length
+          }{" "}
+          aktive oppdrag
         </Text>
       </View>
 
-      {/* MY LOCATION BUTTON */}
+      {/* RELOAD BUTTON */}
       <TouchableOpacity
-        onPress={
-          centerMap
-        }
         style={
-          styles.button
+          styles.reloadButton
+        }
+        onPress={() =>
+          navigation.replace(
+            "Map"
+          )
         }
       >
         <Text
-          style={{
-            color:
-              "white",
-
-            fontWeight:
-              "bold",
-
-            fontSize: 16,
-          }}
+          style={
+            styles.reloadText
+          }
         >
           📍
         </Text>
       </TouchableOpacity>
-
-      {/* BOTTOM SHEET */}
-      {selectedTask && (
-        <View
-          style={
-            styles.bottomSheet
-          }
-        >
-          <Text
-            style={
-              styles.taskTitle
-            }
-          >
-            {
-              selectedTask.title
-            }
-          </Text>
-
-          <Text
-            style={
-              styles.taskReward
-            }
-          >
-            💰{" "}
-            {
-              selectedTask.reward
-            }
-          </Text>
-
-          <Text
-            style={
-              styles.taskCategory
-            }
-          >
-            📂{" "}
-            {selectedTask.category ||
-              "Annet"}
-          </Text>
-
-          <TouchableOpacity
-            style={
-              styles.openButton
-            }
-            onPress={() =>
-              navigation.navigate(
-                "TaskDetail",
-                {
-                  task:
-                    selectedTask,
-                }
-              )
-            }
-          >
-            <Text
-              style={{
-                color:
-                  "white",
-
-                fontWeight:
-                  "bold",
-
-                fontSize: 16,
-              }}
-            >
-              Åpne oppdrag
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }
@@ -577,6 +189,8 @@ const styles =
   StyleSheet.create({
     container: {
       flex: 1,
+      backgroundColor:
+        "#F4F6F8",
     },
 
     map: {
@@ -584,22 +198,14 @@ const styles =
       height: "100%",
     },
 
-    button: {
+    loadingContainer: {
       position:
         "absolute",
 
-      bottom: 140,
-
-      right: 20,
-
-      backgroundColor:
-        "#111827",
-
-      width: 58,
-
-      height: 58,
-
-      borderRadius: 29,
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
 
       justifyContent:
         "center",
@@ -607,60 +213,26 @@ const styles =
       alignItems:
         "center",
 
-      elevation: 5,
-    },
-
-    statusCard: {
-      position:
-        "absolute",
-
-      top: 70,
-
-      left: 20,
-
-      right: 20,
-
       backgroundColor:
-        "white",
+        "#F4F6F8",
 
-      padding: 18,
-
-      borderRadius: 24,
-
-      shadowColor:
-        "#000",
-
-      shadowOpacity: 0.08,
-
-      shadowRadius: 10,
-
-      elevation: 4,
+      zIndex: 999,
     },
 
-    statusTitle: {
-      fontSize: 22,
-
-      fontWeight:
-        "bold",
-
-      color:
-        "#111827",
-
-      marginBottom: 6,
-    },
-
-    statusText: {
-      color:
-        "#6B7280",
+    loadingText: {
+      marginTop: 20,
 
       fontSize: 16,
+
+      color:
+        "#6B7280",
     },
 
-    bottomSheet: {
+    topCard: {
       position:
         "absolute",
 
-      bottom: 25,
+      top: 60,
 
       left: 20,
 
@@ -668,22 +240,15 @@ const styles =
 
       backgroundColor:
         "white",
+
+      padding: 22,
 
       borderRadius: 28,
 
-      padding: 24,
-
-      shadowColor:
-        "#000",
-
-      shadowOpacity: 0.12,
-
-      shadowRadius: 12,
-
-      elevation: 8,
+      elevation: 6,
     },
 
-    taskTitle: {
+    title: {
       fontSize: 24,
 
       fontWeight:
@@ -691,40 +256,46 @@ const styles =
 
       color:
         "#111827",
-
-      marginBottom: 10,
     },
 
-    taskReward: {
-      fontSize: 18,
+    subtitle: {
+      marginTop: 6,
 
-      color:
-        "#22C55E",
-
-      fontWeight:
-        "bold",
-
-      marginBottom: 8,
-    },
-
-    taskCategory: {
-      fontSize: 16,
+      fontSize: 17,
 
       color:
         "#6B7280",
-
-      marginBottom: 20,
     },
 
-    openButton: {
+    reloadButton: {
+      position:
+        "absolute",
+
+      right: 22,
+
+      bottom: 120,
+
+      width: 70,
+
+      height: 70,
+
+      borderRadius: 35,
+
       backgroundColor:
-        "#2563EB",
+        "#0B1437",
 
-      paddingVertical: 16,
-
-      borderRadius: 18,
+      justifyContent:
+        "center",
 
       alignItems:
         "center",
+
+      elevation: 8,
+    },
+
+    reloadText: {
+      color: "white",
+
+      fontSize: 22,
     },
   });

@@ -34,8 +34,8 @@ import {
 export default function ChatScreen({
   route,
 }) {
-  const { task } =
-    route.params;
+  const task =
+    route?.params?.task;
 
   const [messages, setMessages] =
     useState([]);
@@ -49,216 +49,128 @@ export default function ChatScreen({
   const [loading, setLoading] =
     useState(true);
 
-  const [onlineUsers, setOnlineUsers] =
-    useState({});
-
-  const [blockedUsers, setBlockedUsers] =
-    useState([]);
-
   const flatListRef =
     useRef();
 
-  // 🔥 UPDATE ONLINE STATUS
+  // INVALID TASK
+  if (
+    !task ||
+    !task.id
+  ) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent:
+            "center",
+          alignItems:
+            "center",
+          backgroundColor:
+            "#F4F6F8",
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 18,
+            color:
+              "#6B7280",
+          }}
+        >
+          Chat not available
+        </Text>
+      </View>
+    );
+  }
+
+  // REALTIME MESSAGES
   useEffect(() => {
-    const setOnline =
-      async () => {
-        try {
-          await updateDoc(
-            doc(
-              db,
-              "users",
-              auth
-                .currentUser
-                ?.uid
-            ),
-
-            {
-              online: true,
-
-              lastSeen:
-                Date.now(),
-            }
-          );
-        } catch (e) {
-          console.log(
-            e
-          );
-        }
-      };
-
-    setOnline();
-
-    return async () => {
-      try {
-        await updateDoc(
-          doc(
-            db,
-            "users",
-            auth
-              .currentUser
-              ?.uid
-          ),
-
-          {
-            online: false,
-
-            lastSeen:
-              Date.now(),
-          }
-        );
-      } catch (e) {
-        console.log(
-          e
-        );
-      }
-    };
-  }, []);
-
-  // 🔥 LISTEN USERS
-  useEffect(() => {
-    const unsubscribe =
-      onSnapshot(
+    try {
+      const q = query(
         collection(
           db,
-          "users"
+          "messages"
         ),
 
-        (
-          snapshot
-        ) => {
-          const users =
-            {};
-
-          snapshot.docs.forEach(
-            (
-              document
-            ) => {
-              users[
-                document.id
-              ] =
-                document.data();
-            }
-          );
-
-          setOnlineUsers(
-            users
-          );
-        }
+        orderBy(
+          "createdAt",
+          "asc"
+        )
       );
 
-    return unsubscribe;
-  }, []);
+      const unsubscribe =
+        onSnapshot(
+          q,
 
-  // 🔥 REALTIME MESSAGES
-  useEffect(() => {
-    const q = query(
-      collection(
-        db,
-        "messages"
-      ),
+          (
+            snapshot
+          ) => {
+            try {
+              const loadedMessages =
+                snapshot.docs
+                  .map(
+                    (
+                      document
+                    ) => ({
+                      id:
+                        document.id,
 
-      orderBy(
-        "createdAt",
-        "asc"
-      )
-    );
+                      ...document.data(),
+                    })
+                  )
+                  .filter(
+                    (
+                      msg
+                    ) =>
+                      msg &&
+                      msg.taskId ===
+                        task.id
+                  );
 
-    const unsubscribe =
-      onSnapshot(
-        q,
-
-        (
-          snapshot
-        ) => {
-          const loadedMessages =
-            snapshot.docs
-              .map(
-                (
-                  document
-                ) => ({
-                  id:
-                    document.id,
-
-                  ...document.data(),
-                })
-              )
-              .filter(
-                (
-                  msg
-                ) =>
-                  msg.taskId ===
-                  task.id
+              setMessages(
+                loadedMessages
               );
 
-          setMessages(
-            loadedMessages
-          );
+              setLoading(
+                false
+              );
+            } catch (e) {
+              console.log(
+                "MESSAGE LOAD ERROR:",
+                e
+              );
 
-          setLoading(
-            false
-          );
-        },
+              setLoading(
+                false
+              );
+            }
+          },
 
-        (error) => {
-          console.log(
-            error
-          );
-
-          setLoading(
-            false
-          );
-        }
-      );
-
-    return unsubscribe;
-  }, [task.id]);
-
-  // 🔥 MARK AS SEEN
-  useEffect(() => {
-    const markSeen =
-      async () => {
-        try {
-          const unseenMessages =
-            messages.filter(
-              (
-                msg
-              ) =>
-                msg.senderId !==
-                  auth
-                    .currentUser
-                    ?.uid &&
-                !msg.seen
+          (error) => {
+            console.log(
+              "SNAPSHOT ERROR:",
+              error
             );
 
-          for (const msg of unseenMessages) {
-            await updateDoc(
-              doc(
-                db,
-                "messages",
-                msg.id
-              ),
-
-              {
-                seen: true,
-              }
+            setLoading(
+              false
             );
           }
-        } catch (e) {
-          console.log(
-            e
-          );
-        }
-      };
+        );
 
-    if (
-      messages.length >
-      0
-    ) {
-      markSeen();
+      return unsubscribe;
+    } catch (e) {
+      console.log(
+        "CHAT ERROR:",
+        e
+      );
+
+      setLoading(
+        false
+      );
     }
-  }, [messages]);
+  }, [task.id]);
 
-  // 🔥 AUTO SCROLL
+  // AUTO SCROLL
   useEffect(() => {
     setTimeout(() => {
       flatListRef.current?.scrollToEnd(
@@ -269,40 +181,48 @@ export default function ChatScreen({
     }, 100);
   }, [messages]);
 
-  // 🔥 TYPING LISTENER
+  // TYPING LISTENER
   useEffect(() => {
-    const unsubscribe =
-      onSnapshot(
-        doc(
-          db,
-          "typing",
-          task.id
-        ),
+    try {
+      const unsubscribe =
+        onSnapshot(
+          doc(
+            db,
+            "typing",
+            task.id
+          ),
 
-        (
-          docSnap
-        ) => {
-          if (
-            docSnap.exists()
-          ) {
-            setTypingUsers(
-              docSnap.data()
-            );
+          (
+            docSnap
+          ) => {
+            if (
+              docSnap.exists()
+            ) {
+              setTypingUsers(
+                docSnap.data()
+              );
+            }
           }
-        }
-      );
+        );
 
-    return unsubscribe;
+      return unsubscribe;
+    } catch (e) {
+      console.log(
+        "TYPING ERROR:",
+        e
+      );
+    }
   }, [task.id]);
 
-  // 🔥 SEND MESSAGE
+  // SEND MESSAGE
   const sendMessage =
     async () => {
       try {
         if (
           !message.trim()
-        )
+        ) {
           return;
+        }
 
         const textToSend =
           message.trim();
@@ -340,8 +260,6 @@ export default function ChatScreen({
 
             taskId:
               task.id,
-
-            seen: false,
           }
         );
 
@@ -365,12 +283,13 @@ export default function ChatScreen({
         );
       } catch (e) {
         console.log(
+          "SEND ERROR:",
           e
         );
       }
     };
 
-  // 🔥 HANDLE TYPING
+  // HANDLE TYPING
   const handleTyping =
     async (
       text
@@ -401,17 +320,24 @@ export default function ChatScreen({
         );
       } catch (e) {
         console.log(
+          "TYPING SAVE ERROR:",
           e
         );
       }
     };
 
-  // 🔥 DELETE MESSAGE
+  // DELETE MESSAGE
   const deleteMessage =
     async (
       messageId
     ) => {
       try {
+        if (
+          !messageId
+        ) {
+          return;
+        }
+
         await deleteDoc(
           doc(
             db,
@@ -419,15 +345,56 @@ export default function ChatScreen({
             messageId
           )
         );
+      } catch (e) {
+        console.log(
+          "DELETE ERROR:",
+          e
+        );
       }
-      catch (e) {
-  console.log(
-    e
-  );
-}
     };
 
-  // 🔥 LOADING
+  // LONG PRESS
+  const handleLongPress =
+    (item) => {
+      if (
+        !item ||
+        !item.id
+      ) {
+        return;
+      }
+
+      Alert.alert(
+        "Melding",
+
+        "Vil du slette meldingen?",
+
+        [
+          {
+            text:
+              "Avbryt",
+
+            style:
+              "cancel",
+          },
+
+          {
+            text:
+              "Slett",
+
+            style:
+              "destructive",
+
+            onPress:
+              () =>
+                deleteMessage(
+                  item.id
+                ),
+          },
+        ]
+      );
+    };
+
+  // LOADING
   if (loading) {
     return (
       <View
@@ -477,8 +444,8 @@ export default function ChatScreen({
       keyboardVerticalOffset={
         Platform.OS ===
         "ios"
-          ? 120
-          : 100
+          ? 90
+          : 20
       }
     >
       <View
@@ -490,199 +457,160 @@ export default function ChatScreen({
         }}
       >
         {/* HEADER */}
-        <View
-          style={{
-            paddingTop: 60,
-
-            paddingHorizontal: 20,
-
-            paddingBottom: 18,
-
-            backgroundColor:
-              "white",
-
-            borderBottomWidth: 1,
-
-            borderBottomColor:
-              "#E5E7EB",
-          }}
-        >
-          <Text
+        {message.length ===
+          0 && (
+          <View
             style={{
-              fontSize: 24,
+              paddingTop: 60,
 
-              fontWeight:
-                "bold",
+              paddingHorizontal: 20,
 
-              color:
-                "#111827",
+              paddingBottom: 18,
+
+              backgroundColor:
+                "white",
+
+              borderBottomWidth: 1,
+
+              borderBottomColor:
+                "#E5E7EB",
             }}
           >
-            {task.creatorName ||
-              "Chat"}
-          </Text>
-        </View>
+            <Text
+              style={{
+                fontSize: 24,
+
+                fontWeight:
+                  "bold",
+
+                color:
+                  "#111827",
+              }}
+            >
+              {task.createdBy ===
+              auth
+                .currentUser
+                ?.uid
+                ? task.acceptedByName ||
+                  task.acceptedBy ||
+                  "Hjelper"
+                : task.creatorName ||
+                  task.createdByName ||
+                  task.email?.split(
+                    "@"
+                  )[0] ||
+                  "Bruker"}
+            </Text>
+          </View>
+        )}
 
         {/* MESSAGES */}
         <FlatList
           ref={flatListRef}
-          data={messages.filter(
-            (
-              msg
-            ) =>
-              !blockedUsers.includes(
-                msg.senderId
-              )
-          )}
+          data={messages}
           keyExtractor={(
-            item
-          ) => item.id}
+            item,
+            index
+          ) =>
+            item?.id
+              ? item.id.toString()
+              : index.toString()
+          }
           contentContainerStyle={{
             padding: 20,
-
-            paddingBottom: 180,
+            paddingBottom: 40,
           }}
           showsVerticalScrollIndicator={
             false
           }
           renderItem={({
             item,
-          }) => (
-            <TouchableOpacity
-              activeOpacity={
-                0.8
-              }
-              onLongPress={() =>
-                handleLongPress(
-                  item
-                )
-              }
-              style={{
-                backgroundColor:
-                  item.senderId ===
-                  auth
-                    .currentUser
-                    ?.uid
-                    ? "#2563EB"
-                    : "#E5E7EB",
+          }) => {
+            if (
+              !item
+            ) {
+              return null;
+            }
 
-                padding: 14,
-
-                borderRadius: 18,
-
-                marginBottom: 10,
-
-                alignSelf:
-                  item.senderId ===
-                  auth
-                    .currentUser
-                    ?.uid
-                    ? "flex-end"
-                    : "flex-start",
-
-                maxWidth:
-                  "80%",
-              }}
-            >
-              <Text
+            return (
+              <TouchableOpacity
+                activeOpacity={
+                  0.8
+                }
+                onLongPress={() =>
+                  handleLongPress(
+                    item
+                  )
+                }
                 style={{
-                  fontSize: 12,
-
-                  marginBottom: 4,
-
-                  fontWeight:
-                    "bold",
-
-                  color:
+                  backgroundColor:
                     item.senderId ===
                     auth
                       .currentUser
                       ?.uid
-                      ? "#DCEBFF"
-                      : "#6B7280",
-                }}
-              >
-                {item.senderName ||
-                  "Bruker"}
-              </Text>
+                      ? "#2563EB"
+                      : "#E5E7EB",
 
-              <Text
-                style={{
-                  color:
+                  padding: 14,
+
+                  borderRadius: 18,
+
+                  marginBottom: 10,
+
+                  alignSelf:
                     item.senderId ===
                     auth
                       .currentUser
                       ?.uid
-                      ? "white"
-                      : "black",
+                      ? "flex-end"
+                      : "flex-start",
 
-                  fontSize: 16,
+                  maxWidth:
+                    "80%",
                 }}
               >
-                {item.text}
-              </Text>
+                <Text
+                  style={{
+                    fontSize: 12,
 
-              <Text
-                style={{
-                  fontSize: 10,
+                    marginBottom: 4,
 
-                  marginTop: 6,
+                    fontWeight:
+                      "bold",
 
-                  color:
-                    item.senderId ===
-                    auth
-                      .currentUser
-                      ?.uid
-                      ? "#DCEBFF"
-                      : "#6B7280",
-                }}
-              >
-                {formatTime(
-                  item.createdAt
-                )}
+                    color:
+                      item.senderId ===
+                      auth
+                        .currentUser
+                        ?.uid
+                        ? "#DCEBFF"
+                        : "#6B7280",
+                  }}
+                >
+                  {item.senderName ||
+                    "Bruker"}
+                </Text>
 
-                {item.senderId ===
-                  auth
-                    .currentUser
-                    ?.uid && (
-                  <Text>
-                    {item.seen
-                      ? " ✓✓"
-                      : " ✓"}
-                  </Text>
-                )}
-              </Text>
-            </TouchableOpacity>
-          )}
+                <Text
+                  style={{
+                    color:
+                      item.senderId ===
+                      auth
+                        .currentUser
+                        ?.uid
+                        ? "white"
+                        : "black",
+
+                    fontSize: 16,
+                  }}
+                >
+                  {item.text ||
+                    ""}
+                </Text>
+              </TouchableOpacity>
+            );
+          }}
         />
-
-        {/* TYPING */}
-        {Object.entries(
-          typingUsers
-        ).some(
-          ([
-            uid,
-            isTyping,
-          ]) =>
-            uid !==
-              auth
-                .currentUser
-                ?.uid &&
-            isTyping
-        ) && (
-          <Text
-            style={{
-              marginLeft: 20,
-
-              marginBottom: 10,
-
-              color:
-                "#6B7280",
-            }}
-          >
-            ✍️ skriver...
-          </Text>
-        )}
 
         {/* INPUT */}
         <View
@@ -695,8 +623,8 @@ export default function ChatScreen({
             paddingBottom:
               Platform.OS ===
               "ios"
-                ? 110
-                : 130,
+                ? 25
+                : 10,
 
             backgroundColor:
               "white",
