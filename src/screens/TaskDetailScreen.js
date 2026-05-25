@@ -1,1121 +1,547 @@
 import React, {
-  useContext,
+  useEffect,
   useState,
 } from "react";
 
 import {
   View,
   Text,
-  TouchableOpacity,
   ScrollView,
   Image,
-  Alert,
+  TouchableOpacity,
   ActivityIndicator,
-  Modal,
-  TextInput,
+  Alert,
 } from "react-native";
 
-import * as Linking from "expo-linking";
-import * as Location from "expo-location";
+import {
+  doc,
+  getDoc,
+  updateDoc,
+} from "firebase/firestore";
 
 import {
   auth,
   db,
 } from "../firebaseConfig";
 
-import {
-  TaskContext,
-} from "../context/TaskContext";
-
-import {
-  NotificationContext,
-} from "../context/NotificationContext";
-
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-  updateDoc,
-  deleteDoc,
-  doc,
-} from "firebase/firestore";
-
 export default function TaskDetailScreen({
   route,
   navigation,
 }) {
-  const { task } = route.params;
 
-  const isOwner =
-    task?.createdBy ===
-    auth.currentUser?.uid;
+  const { taskId } =
+    route.params;
 
-  const {
-    acceptTask,
-    completeTask,
-  } = useContext(TaskContext);
-
-  const {
-    addNotification,
-  } = useContext(NotificationContext);
+  const [task, setTask] =
+    useState(null);
 
   const [loading, setLoading] =
+    useState(true);
+
+  const [accepting, setAccepting] =
     useState(false);
 
-  const [showReview, setShowReview] =
-    useState(false);
+  // LOAD TASK
 
-  const [rating, setRating] =
-    useState(5);
+  useEffect(() => {
 
-  const [reviewText, setReviewText] =
-    useState("");
+    const loadTask =
+      async () => {
 
-  // REVIEW
+        try {
 
-  const submitReview = async () => {
-    if (!reviewText.trim()) {
-      return Alert.alert(
-        "Skriv en review"
-      );
-    }
+          const ref =
+            doc(
+              db,
+              "tasks",
+              taskId
+            );
 
-    try {
-      await addDoc(
-        collection(db, "reviews"),
-        {
-          taskId: task.id,
-          rating,
-          text: reviewText,
-          from: auth.currentUser.uid,
-          to: task.acceptedById,
-          createdAt:
-            serverTimestamp(),
-        }
-      );
+          const snapshot =
+            await getDoc(ref);
 
-      setShowReview(false);
+          if (
+            snapshot.exists()
+          ) {
 
-      Alert.alert(
-        "Review sendt ⭐"
-      );
-    } catch (e) {
-      console.log(
-        "REVIEW ERROR:",
-        e
-      );
+            setTask({
+              id:
+                snapshot.id,
 
-      Alert.alert(
-        "Kunne ikke sende review"
-      );
-    }
-  };
+              ...snapshot.data(),
+            });
+          }
 
-  // LIVE TRACKING
+        } catch (e) {
 
-  const startLiveTracking =
-    async () => {
-      try {
-        const { status } =
-          await Location.requestForegroundPermissionsAsync();
-
-        if (
-          status !== "granted"
-        ) {
-          return;
-        }
-
-        const subscription =
-          await Location.watchPositionAsync(
-            {
-              accuracy:
-                Location.Accuracy.Balanced,
-
-              timeInterval: 4000,
-
-              distanceInterval: 8,
-            },
-
-            async (
-              location
-            ) => {
-              try {
-                await updateDoc(
-                  doc(
-                    db,
-                    "tasks",
-                    task.id
-                  ),
-
-                  {
-                    helperLatitude:
-                      location.coords.latitude,
-
-                    helperLongitude:
-                      location.coords.longitude,
-
-                    trackingActive:
-                      true,
-                  }
-                );
-              } catch (e) {
-                console.log(
-                  "TRACK UPDATE ERROR:",
-                  e
-                );
-              }
-            }
+          console.log(
+            "TASK DETAIL ERROR:",
+            e
           );
 
-        setTimeout(() => {
-          subscription.remove();
-        }, 1000 * 60 * 60);
-      } catch (e) {
-        console.log(
-          "TRACK ERROR:",
-          e
-        );
-      }
-    };
+          Alert.alert(
+            "Kunne ikke laste oppdrag"
+          );
 
-  // DELETE TASK
+        } finally {
 
-  const deleteTask =
-    async () => {
-      Alert.alert(
-        "Slett oppdrag",
-        "Er du sikker?",
+          setLoading(false);
+        }
+      };
 
-        [
-          {
-            text:
-              "Avbryt",
+    loadTask();
 
-            style:
-              "cancel",
-          },
+  }, []);
 
-          {
-            text:
-              "Slett",
-
-            style:
-              "destructive",
-
-            onPress:
-              async () => {
-                try {
-                  await deleteDoc(
-                    doc(
-                      db,
-                      "tasks",
-                      task.id
-                    )
-                  );
-
-                  Alert.alert(
-                    "Oppdrag slettet"
-                  );
-
-                  navigation.goBack();
-                } catch (e) {
-                  console.log(
-                    "DELETE ERROR:",
-                    e
-                  );
-
-                  Alert.alert(
-                    "Feil ved sletting"
-                  );
-                }
-              },
-          },
-        ]
-      );
-    };
-
-  // MAPS
-
-  const openMaps = () => {
-    if (
-      !task?.latitude ||
-      !task?.longitude
-    ) {
-      return Alert.alert(
-        "Ingen lokasjon funnet"
-      );
-    }
-
-    const url =
-      `https://www.google.com/maps/search/?api=1&query=${task.latitude},${task.longitude}`;
-
-    Linking.openURL(url);
-  };
-
-  // STATUS
-
-  const getStatusColor =
-    () => {
-      switch (
-        task?.status
-      ) {
-        case "accepted":
-          return "#F59E0B";
-
-        case "working":
-          return "#EC4899";
-
-        case "completed":
-          return "#22C55E";
-
-        default:
-          return "#EF4444";
-      }
-    };
-
-  const getStatusText =
-    () => {
-      switch (
-        task?.status
-      ) {
-        case "accepted":
-          return "Akseptert";
-
-        case "working":
-          return "Utfører oppdrag";
-
-        case "completed":
-          return "Fullført";
-
-        default:
-          return "Åpen";
-      }
-    };
-
-  const getTimeAgo = (
-    timestamp
-  ) => {
-    if (!timestamp)
-      return "Nettopp";
-
-    let time = timestamp;
-
-    if (
-      typeof timestamp ===
-        "object" &&
-      timestamp?.seconds
-    ) {
-      time =
-        timestamp.seconds *
-        1000;
-    }
-
-    const now = Date.now();
-
-    const diff =
-      now - time;
-
-    const minutes =
-      Math.floor(
-        diff / 60000
-      );
-
-    const hours =
-      Math.floor(
-        minutes / 60
-      );
-
-    if (minutes < 1)
-      return "Nettopp";
-
-    if (minutes < 60)
-      return `${minutes} min siden`;
-
-    if (hours < 24)
-      return `${hours} t siden`;
-
-    return `${Math.floor(
-      hours / 24
-    )} d siden`;
-  };
-
-  const getDistance = () => {
-    return "2 km unna";
-  };
-
-  // ACCEPT
+  // ACCEPT TASK
 
   const handleAcceptTask =
     async () => {
+
       try {
-        setLoading(true);
 
-        await acceptTask(
-          task.id,
+        setAccepting(true);
 
-          auth.currentUser
-            ?.displayName ||
-            "Hjelper"
-        );
+        await updateDoc(
+          doc(
+            db,
+            "tasks",
+            task.id
+          ),
 
-        await startLiveTracking();
-
-        addNotification({
-          title:
-            "🎉 Oppdrag akseptert",
-
-          message:
-            "Noen vil hjelpe deg",
-
-          task,
-        });
-
-        navigation.push(
-          "Chat",
           {
-            taskId:
-              task.id,
+            accepted: true,
+
+            acceptedBy:
+              auth.currentUser?.uid,
+
+            acceptedAt:
+              Date.now(),
           }
         );
+
+        Alert.alert(
+          "Oppdrag akseptert 🔥"
+        );
+
+        navigation.goBack();
+
       } catch (e) {
+
         console.log(
           "ACCEPT ERROR:",
           e
         );
 
         Alert.alert(
-          "Noe gikk galt"
+          "Kunne ikke akseptere oppdrag"
         );
+
       } finally {
-        setLoading(false);
+
+        setAccepting(false);
       }
     };
 
-  // COMPLETE
+  // LOADING
 
-  const handleCompleteTask =
-    async () => {
-      try {
-        setLoading(true);
+  if (loading) {
 
-        await completeTask(
-          task.id
-        );
+    return (
 
-        setShowReview(true);
-      } catch (e) {
-        console.log(
-          "COMPLETE ERROR:",
-          e
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
+      <View
+        style={{
+          flex: 1,
 
-  return (
-    <ScrollView
-      style={{
-        flex: 1,
-        backgroundColor:
-          "#F4F6F8",
-      }}
-      contentContainerStyle={{
-        padding: 22,
-        paddingTop: 60,
-        paddingBottom: 180,
-      }}
-      showsVerticalScrollIndicator={
-        false
-      }
-    >
-      {/* IMAGE */}
+          justifyContent:
+            "center",
 
-      {task?.image ? (
-        <Image
-          source={{
-            uri: task.image,
-          }}
-          style={{
-            width: "100%",
-            height: 280,
-            borderRadius: 32,
-            marginBottom: 24,
-          }}
+          alignItems:
+            "center",
+
+          backgroundColor:
+            "#F4F6F8",
+        }}
+      >
+
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
         />
-      ) : null}
 
-      {/* STATUS */}
-
-      <View
-  style={{
-    marginBottom: 26,
-  }}
->
-
-  <View
-    style={{
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 14,
-    }}
-  >
-
-    <View
-      style={{
-        backgroundColor:
-          getStatusColor(),
-
-        paddingHorizontal: 14,
-
-        paddingVertical: 8,
-
-        borderRadius: 99,
-      }}
-    >
-      <Text
-        style={{
-          color: "white",
-          fontWeight: "700",
-          fontSize: 13,
-        }}
-      >
-        {getStatusText()}
-      </Text>
-    </View>
-
-    {task?.urgent && (
-      <View
-        style={{
-          backgroundColor:
-            "#FEE2E2",
-
-          marginLeft: 10,
-
-          paddingHorizontal: 12,
-
-          paddingVertical: 8,
-
-          borderRadius: 99,
-        }}
-      >
-        <Text
-          style={{
-            color: "#DC2626",
-            fontWeight: "700",
-            fontSize: 13,
-          }}
-        >
-          Haster
-        </Text>
       </View>
-    )}
+    );
+  }
 
-  </View>
+  // NO TASK
 
-  <Text
-    style={{
-      fontSize: 34,
-      fontWeight: "800",
-      color: "#111827",
-      marginBottom: 12,
-      lineHeight: 40,
-    }}
-  >
-    {task?.title}
-  </Text>
+  if (!task) {
 
-  <Text
-    style={{
-      fontSize: 42,
-      fontWeight: "800",
-      color: "#22C55E",
-      marginBottom: 18,
-    }}
-  >
-    {task?.reward || "0 kr"}
-  </Text>
-
-  <View
-    style={{
-      flexDirection: "row",
-      alignItems: "center",
-    }}
-  >
-    <Text
-      style={{
-        color: "#6B7280",
-        fontSize: 15,
-      }}
-    >
-      📍 {getDistance()} •{" "}
-      {getTimeAgo(
-        task.createdAt
-      )}
-    </Text>
-  </View>
-
-</View>
-
-      {/* DESCRIPTION */}
+    return (
 
       <View
         style={{
+          flex: 1,
+
+          justifyContent:
+            "center",
+
+          alignItems:
+            "center",
+
           backgroundColor:
-            "white",
-
-          padding: 24,
-
-          borderRadius: 28,
-
-          marginBottom: 24,
+            "#F4F6F8",
         }}
       >
+
         <Text
           style={{
             fontSize: 18,
 
-            color:
-              "#374151",
-
-            lineHeight: 28,
+            color: "#111827",
           }}
         >
-          {task?.description ||
-            "Ingen beskrivelse"}
+          Oppdrag finnes ikke
         </Text>
+
       </View>
+    );
+  }
 
-      {/* USER */}
-
-      <View
-  style={{
-    backgroundColor:
-      "rgba(255,255,255,0.96)",
-
-    padding: 22,
-
-    borderRadius: 30,
-
-    marginBottom: 30,
-
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    borderWidth: 1,
-
-    borderColor:
-      "rgba(255,255,255,0.8)",
-  }}
->
-
-  <View>
+  return (
 
     <View
       style={{
-        width: 72,
-        height: 72,
-        borderRadius: 36,
+        flex: 1,
 
         backgroundColor:
-          "#2563EB",
-
-        justifyContent:
-          "center",
-
-        alignItems:
-          "center",
-
-        marginRight: 18,
+          "#F4F6F8",
       }}
     >
-      <Text
-        style={{
-          color: "white",
 
-          fontSize: 28,
-
-          fontWeight: "800",
+      <ScrollView
+        contentContainerStyle={{
+          paddingBottom: 140,
         }}
+
+        showsVerticalScrollIndicator={
+          false
+        }
       >
-        {task?.creatorName?.charAt(
-          0
-        ) || "A"}
-      </Text>
-    </View>
 
-    <View
-      style={{
-        position: "absolute",
+        {/* IMAGE */}
 
-        bottom: 2,
+        {task.image ? (
 
-        right: 14,
+          <Image
+            source={{
+              uri:
+                task.image,
+            }}
 
-        width: 24,
+            style={{
+              width: "100%",
 
-        height: 24,
+              height: 280,
+            }}
 
-        borderRadius: 12,
+            resizeMode="cover"
+          />
 
-        backgroundColor:
-          "#22C55E",
+        ) : (
 
-        justifyContent:
-          "center",
+          <View
+            style={{
+              width: "100%",
 
-        alignItems:
-          "center",
+              height: 280,
 
-        borderWidth: 2,
+              backgroundColor:
+                "#E5E7EB",
 
-        borderColor: "white",
-      }}
-    >
-      <Text
-        style={{
-          color: "white",
+              justifyContent:
+                "center",
 
-          fontSize: 12,
+              alignItems:
+                "center",
+            }}
+          >
 
-          fontWeight: "bold",
-        }}
-      >
-        ✓
-      </Text>
-    </View>
+            <Text
+              style={{
+                fontSize: 50,
+              }}
+            >
+              📦
+            </Text>
 
-  </View>
+          </View>
+        )}
 
-  <View
-    style={{
-      flex: 1,
-    }}
-  >
-
-    <Text
-      style={{
-        fontSize: 15,
-
-        color: "#6B7280",
-
-        marginBottom: 6,
-      }}
-    >
-      Opprettet av
-    </Text>
-
-    <Text
-      style={{
-        fontSize: 24,
-
-        fontWeight: "800",
-
-        color: "#111827",
-      }}
-    >
-      {task?.creatorName ||
-        "Anonym"}
-    </Text>
-
-    <Text
-      style={{
-        color: "#F59E0B",
-
-        marginTop: 6,
-
-        fontWeight: "700",
-      }}
-    >
-      ⭐ {task?.creatorRating || 5}
-    </Text>
-
-  </View>
-
-</View>
-
-      {/* ACCEPT */}
-
-      {/* ACCEPT */}
-
-{!isOwner &&
-!task?.acceptedById &&
-!task?.completed && (
-
-  <View
-    style={{
-      position: "absolute",
-
-      left: 20,
-
-      right: 20,
-
-      bottom: 40,
-    }}
-  >
-
-    <TouchableOpacity
-      disabled={loading}
-      onPress={
-        handleAcceptTask
-      }
-
-      activeOpacity={0.9}
-
-      style={{
-        backgroundColor:
-          "#22C55E",
-
-        height: 74,
-
-        borderRadius: 28,
-
-        justifyContent:
-          "center",
-
-        alignItems:
-          "center",
-
-        marginBottom: 22,
-
-        shadowColor:
-          "#22C55E",
-
-        shadowOpacity: 0.35,
-
-        shadowRadius: 18,
-
-        elevation: 12,
-      }}
-    >
-
-      {loading ? (
-
-        <ActivityIndicator
-          color="white"
-        />
-
-      ) : (
+        {/* CONTENT */}
 
         <View
           style={{
-            flexDirection:
-              "row",
-
-            alignItems:
-              "center",
-          }}
-        >
-
-          <Text
-            style={{
-              color:
-                "white",
-
-              fontSize: 22,
-
-              fontWeight:
-                "800",
-
-              marginRight: 10,
-            }}
-          >
-            Jeg kan hjelpe
-          </Text>
-
-          <Text
-            style={{
-              fontSize: 24,
-            }}
-          >
-            →
-          </Text>
-
-        </View>
-      )}
-
-    </TouchableOpacity>
-
-  </View>
-)}
-
-      {/* COMPLETE */}
-
-      {task?.status ===
-      "working" && (
-        <TouchableOpacity
-          disabled={
-            loading
-          }
-          onPress={
-            handleCompleteTask
-          }
-          style={{
-            backgroundColor:
-              "#22C55E",
-
-            padding: 24,
-
-            borderRadius: 28,
-
-            alignItems:
-              "center",
-
-            marginBottom: 20,
-          }}
-        >
-          <Text
-            style={{
-              color:
-                "white",
-
-              fontSize: 20,
-
-              fontWeight:
-                "bold",
-            }}
-          >
-            Fullfør oppdrag
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {/* MAPS */}
-
-      <TouchableOpacity
-        onPress={
-          openMaps
-        }
-        style={{
-          backgroundColor:
-            "#0B1437",
-
-          padding: 22,
-
-          borderRadius: 24,
-
-          alignItems:
-            "center",
-        }}
-      >
-        <Text
-          style={{
-            color:
-              "white",
-
-            fontSize: 20,
-
-            fontWeight:
-              "bold",
-          }}
-        >
-          Åpne i Google Maps
-        </Text>
-      </TouchableOpacity>
-
-      {/* DELETE */}
-
-      {isOwner ? (
-        <TouchableOpacity
-          onPress={
-            deleteTask
-          }
-          style={{
-            backgroundColor:
-              "#EF4444",
-
-            marginTop: 16,
-
-            height: 65,
-
-            borderRadius: 22,
-
-            justifyContent:
-              "center",
-
-            alignItems:
-              "center",
-          }}
-        >
-          <Text
-            style={{
-              color:
-                "white",
-
-              fontSize: 22,
-
-              fontWeight:
-                "bold",
-            }}
-          >
-            Slett oppdrag
-          </Text>
-        </TouchableOpacity>
-      ) : null}
-
-      {/* REVIEW MODAL */}
-
-      <Modal
-        visible={
-          showReview
-        }
-        transparent
-        animationType="slide"
-      >
-        <View
-          style={{
-            flex: 1,
-
-            backgroundColor:
-              "rgba(0,0,0,0.4)",
-
-            justifyContent:
-              "center",
-
             padding: 24,
           }}
         >
+
+          {/* CATEGORY */}
+
+          <View
+            style={{
+              alignSelf:
+                "flex-start",
+
+              backgroundColor:
+                "#DBEAFE",
+
+              paddingHorizontal: 14,
+
+              paddingVertical: 8,
+
+              borderRadius: 999,
+
+              marginBottom: 18,
+            }}
+          >
+
+            <Text
+              style={{
+                color: "#2563EB",
+
+                fontWeight: "700",
+              }}
+            >
+              {task.category ||
+                "Annet"}
+            </Text>
+
+          </View>
+
+          {/* TITLE */}
+
+          <Text
+            style={{
+              fontSize: 34,
+
+              fontWeight: "bold",
+
+              color: "#111827",
+
+              marginBottom: 16,
+            }}
+          >
+            {task.title}
+          </Text>
+
+          {/* PRICE */}
+
+          <Text
+            style={{
+              fontSize: 28,
+
+              fontWeight: "bold",
+
+              color: "#22C55E",
+
+              marginBottom: 24,
+            }}
+          >
+            {task.price
+              ? `${task.price} kr`
+              : task.reward}
+          </Text>
+
+          {/* DESCRIPTION */}
+
+          <Text
+            style={{
+              fontSize: 18,
+
+              lineHeight: 30,
+
+              color: "#374151",
+
+              marginBottom: 32,
+            }}
+          >
+            {task.description ||
+              "Ingen beskrivelse"}
+          </Text>
+
+          {/* CREATOR */}
+
           <View
             style={{
               backgroundColor:
-                "white",
+                "#FFFFFF",
 
-              borderRadius: 28,
+              padding: 22,
 
-              padding: 24,
+              borderRadius: 24,
+
+              marginBottom: 24,
             }}
           >
+
             <Text
               style={{
-                fontSize: 28,
+                color: "#6B7280",
 
-                fontWeight:
-                  "bold",
-
-                marginBottom: 20,
+                marginBottom: 8,
               }}
             >
-              Gi review ⭐
+              Opprettet av
             </Text>
 
-            <View
+            <Text
               style={{
-                flexDirection:
-                  "row",
+                fontSize: 18,
 
-                marginBottom: 24,
+                fontWeight: "700",
+
+                color: "#111827",
               }}
             >
-              {[1,2,3,4,5].map(
-                (star) => (
-                  <TouchableOpacity
-                    key={star}
-                    onPress={() =>
-                      setRating(star)
-                    }
-                  >
-                    <Text
-                      style={{
-                        fontSize: 42,
+              {task.creatorName ||
+                "Bruker"}
+            </Text>
 
-                        marginRight: 8,
-                      }}
-                    >
-                      {star <= rating
-                        ? "⭐"
-                        : "☆"}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </View>
-
-            <TextInput
-              placeholder="Hvordan var hjelpen?"
-              value={
-                reviewText
-              }
-              onChangeText={
-                setReviewText
-              }
-              multiline
-              style={{
-                backgroundColor:
-                  "#F3F4F6",
-
-                borderRadius: 18,
-
-                padding: 18,
-
-                height: 120,
-
-                textAlignVertical:
-                  "top",
-
-                marginBottom: 24,
-              }}
-            />
-
-            <TouchableOpacity
-              onPress={
-                submitReview
-              }
-              style={{
-                backgroundColor:
-                  "#2563EB",
-
-                height: 62,
-
-                borderRadius: 20,
-
-                justifyContent:
-                  "center",
-
-                alignItems:
-                  "center",
-
-                marginBottom: 12,
-              }}
-            >
-              <Text
-                style={{
-                  color:
-                    "white",
-
-                  fontSize: 20,
-
-                  fontWeight:
-                    "bold",
-                }}
-              >
-                Send review
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() =>
-                setShowReview(false)
-              }
-              style={{
-                alignItems:
-                  "center",
-              }}
-            >
-              <Text
-                style={{
-                  color:
-                    "#6B7280",
-
-                  fontSize: 16,
-                }}
-              >
-                Lukk
-              </Text>
-            </TouchableOpacity>
           </View>
+
+          {/* LOCATION */}
+
+          <View
+            style={{
+              backgroundColor:
+                "#FFFFFF",
+
+              padding: 22,
+
+              borderRadius: 24,
+
+              marginBottom: 30,
+            }}
+          >
+
+            <Text
+              style={{
+                fontSize: 18,
+
+                fontWeight: "700",
+
+                color: "#111827",
+
+                marginBottom: 8,
+              }}
+            >
+              Lokasjon
+            </Text>
+
+            <Text
+              style={{
+                color: "#6B7280",
+              }}
+            >
+              GPS registrert
+            </Text>
+
+          </View>
+
+          {/* ACCEPT BUTTON */}
+
+          {!task.accepted && (
+
+            <TouchableOpacity
+              disabled={
+                accepting
+              }
+
+              onPress={
+                handleAcceptTask
+              }
+
+              style={{
+                backgroundColor:
+                  accepting
+                    ? "#93C5FD"
+                    : "#2563EB",
+
+                padding: 24,
+
+                borderRadius: 28,
+
+                alignItems:
+                  "center",
+              }}
+            >
+
+              {accepting ? (
+
+                <ActivityIndicator
+                  color="white"
+                />
+
+              ) : (
+
+                <Text
+                  style={{
+                    color:
+                      "#FFFFFF",
+
+                    fontSize: 22,
+
+                    fontWeight:
+                      "bold",
+                  }}
+                >
+                  Aksepter oppdrag
+                </Text>
+              )}
+
+            </TouchableOpacity>
+          )}
+
         </View>
-      </Modal>
-    </ScrollView>
+
+      </ScrollView>
+
+      {/* LOADING OVERLAY */}
+
+      {accepting && (
+
+        <View
+          style={{
+            position:
+              "absolute",
+
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+
+            justifyContent:
+              "center",
+
+            alignItems:
+              "center",
+
+            backgroundColor:
+              "rgba(255,255,255,0.35)",
+
+            zIndex: 999,
+          }}
+        >
+
+          <ActivityIndicator
+            size="large"
+            color="#2563EB"
+          />
+
+        </View>
+      )}
+
+    </View>
   );
 }

@@ -243,8 +243,6 @@ const handleCreateTask =
         rewardNumber > 50000
       ) {
 
-        setLoading(false);
-
         return Alert.alert(
           "Belønning må være mellom 50 og 50000 kr"
         );

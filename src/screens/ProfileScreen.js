@@ -62,6 +62,9 @@ export default function ProfileScreen() {
   const [userData, setUserData] =
     useState(null);
 
+  const [loading, setLoading] =
+  useState(false);
+
   const [reviews, setReviews] =
     useState([]);
 
@@ -414,28 +417,31 @@ export default function ProfileScreen() {
 
     try {
 
+      setLoading(true);
+
+      console.log(
+        "AUTH:",
+          auth
+        );
+
       await signOut(auth);
-
-      navigation.reset({
-        index: 0,
-
-        routes: [
-          {
-            name:
-              "Login",
-          },
-        ],
-      });
 
     } catch (e) {
 
-      console.log(e);
+      console.log(
+        "LOGOUT ERROR:",
+        e
+      );
 
       Alert.alert(
         "Logout feilet"
       );
+
+    } finally {
+
+      setLoading(false);
     }
-  };
+};
 
   // DELETE ACCOUNT
   const removeAccount =
