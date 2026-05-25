@@ -303,10 +303,10 @@ export default function LoginScreen() {
       } catch (e) {
 
         console.log(e);
-
-        Alert.alert(
-          "Kunne ikke sende email"
-        );
+          Alert.alert(
+          "Firebase Error",
+          e.message
+            );
       }
     };
 
@@ -672,6 +672,290 @@ export default function LoginScreen() {
 
       </ScrollView>
 
+    <Modal
+  visible={showRegister}
+
+  animationType="slide"
+
+  transparent
+>
+
+  <View
+    style={{
+      flex: 1,
+
+      backgroundColor:
+        "rgba(0,0,0,0.4)",
+
+      justifyContent:
+        "center",
+
+      padding: 24,
+    }}
+  >
+
+    <View
+      style={{
+        backgroundColor:
+          "white",
+
+        borderRadius: 30,
+
+        padding: 24,
+      }}
+    >
+
+      <Text
+        style={{
+          fontSize: 28,
+
+          fontWeight: "bold",
+
+          marginBottom: 24,
+        }}
+      >
+        Registrer 😄
+      </Text>
+
+      <TextInput
+        placeholder="Navn"
+
+        value={registerName}
+
+        onChangeText={
+          setRegisterName
+        }
+
+        placeholderTextColor="#9CA3AF"
+
+        style={{
+          backgroundColor:
+            "#F1F5F9",
+
+          borderRadius: 18,
+
+          padding: 18,
+
+          marginBottom: 14,
+        }}
+      />
+
+      <TextInput
+        placeholder="Telefon"
+
+        value={registerPhone}
+
+        onChangeText={
+          setRegisterPhone
+        }
+
+        keyboardType="phone-pad"
+
+        placeholderTextColor="#9CA3AF"
+
+        style={{
+          backgroundColor:
+            "#F1F5F9",
+
+          borderRadius: 18,
+
+          padding: 18,
+
+          marginBottom: 14,
+        }}
+      />
+
+      <TextInput
+        placeholder="Email"
+
+        value={registerEmail}
+
+        onChangeText={
+          setRegisterEmail
+        }
+
+        autoCapitalize="none"
+
+        placeholderTextColor="#9CA3AF"
+
+        style={{
+          backgroundColor:
+            "#F1F5F9",
+
+          borderRadius: 18,
+
+          padding: 18,
+
+          marginBottom: 14,
+        }}
+      />
+
+      <TextInput
+        placeholder="Passord"
+
+        secureTextEntry
+
+        value={registerPassword}
+
+        onChangeText={
+          setRegisterPassword
+        }
+
+        placeholderTextColor="#9CA3AF"
+
+        style={{
+          backgroundColor:
+            "#F1F5F9",
+
+          borderRadius: 18,
+
+          padding: 18,
+
+          marginBottom: 22,
+        }}
+      />
+
+      <TouchableOpacity
+        onPress={register}
+
+        style={{
+          backgroundColor:
+            "#2563EB",
+
+          padding: 20,
+
+          borderRadius: 20,
+
+          alignItems:
+            "center",
+        }}
+      >
+
+        <Text
+          style={{
+            color: "white",
+
+            fontSize: 18,
+
+            fontWeight: "bold",
+          }}
+        >
+          Opprett bruker
+        </Text>
+
+      </TouchableOpacity>
+
+    </View>
+
+  </View>
+
+</Modal>
+
+<Modal
+  visible={showForgotPassword}
+
+  animationType="slide"
+
+  transparent
+>
+
+  <View
+    style={{
+      flex: 1,
+
+      backgroundColor:
+        "rgba(0,0,0,0.4)",
+
+      justifyContent:
+        "center",
+
+      padding: 24,
+    }}
+  >
+
+    <View
+      style={{
+        backgroundColor:
+          "white",
+
+        borderRadius: 30,
+
+        padding: 24,
+      }}
+    >
+
+      <Text
+        style={{
+          fontSize: 28,
+
+          fontWeight: "bold",
+
+          marginBottom: 24,
+        }}
+      >
+        Glemt passord 😄
+      </Text>
+
+      <TextInput
+        placeholder="Email"
+
+        value={resetEmail}
+
+        onChangeText={
+          setResetEmail
+        }
+
+        autoCapitalize="none"
+
+        placeholderTextColor="#9CA3AF"
+
+        style={{
+          backgroundColor:
+            "#F1F5F9",
+
+          borderRadius: 18,
+
+          padding: 18,
+
+          marginBottom: 22,
+        }}
+      />
+
+      <TouchableOpacity
+        onPress={resetPassword}
+
+        style={{
+          backgroundColor:
+            "#2563EB",
+
+          padding: 20,
+
+          borderRadius: 20,
+
+          alignItems:
+            "center",
+        }}
+      >
+
+        <Text
+          style={{
+            color: "white",
+
+            fontSize: 18,
+
+            fontWeight: "bold",
+          }}
+        >
+          Send email
+        </Text>
+
+      </TouchableOpacity>
+
+    </View>
+
+  </View>
+
+</Modal>
     </KeyboardAvoidingView>
   );
 }
