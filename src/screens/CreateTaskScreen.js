@@ -135,11 +135,43 @@ export default function CreateTaskScreen({
 
       try {
 
-        const response =
-          await fetch(uri);
-
         const blob =
-          await response.blob();
+  await new Promise(
+    (resolve, reject) => {
+
+      const xhr =
+        new XMLHttpRequest();
+
+      xhr.onload =
+        function () {
+
+          resolve(
+            xhr.response
+          );
+        };
+
+      xhr.onerror =
+        function () {
+
+          reject(
+            new TypeError(
+              "Network request failed"
+            )
+          );
+        };
+
+      xhr.responseType =
+        "blob";
+
+      xhr.open(
+        "GET",
+        uri,
+        true
+      );
+
+      xhr.send(null);
+    }
+  );
 
         const filename =
           `task_${Date.now()}`;
@@ -175,186 +207,191 @@ export default function CreateTaskScreen({
 
   // CREATE TASK
 
-  const handleCreateTask =
-    async () => {
+const handleCreateTask =
+  async () => {
 
-      try {
+    try {
 
-        if (
-          !title.trim()
-        ) {
+      if (
+        !title.trim()
+      ) {
 
-          return Alert.alert(
-            "Mangler tittel"
-          );
-        }
-
-        if (
-          !reward.trim()
-        ) {
-
-          const rewardNumber =
-            Number(reward);
-
-              if (
-              isNaN(rewardNumber) ||
-
-                rewardNumber < 50 ||
-
-                rewardNumber > 50000
-            ) {
-
-                setLoading(false);
-
-                return Alert.alert(
-                 "Belønning må være mellom 50 og 50000 kr"
-                  );
-              }
-        }
-
-        setLoading(true);
-
-        let imageUrl = "";
-
-        if (image) {
-
-          imageUrl =
-            await uploadImage(
-              image
-            );
-        }
-
-        // LOCATION
-
-        const { status } =
-          await Location.requestForegroundPermissionsAsync();
-
-        if (
-          status !==
-          "granted"
-        ) {
-
-          Alert.alert(
-            "Lokasjon kreves"
-          );
-
-          setLoading(false);
-
-          return;
-        }
-
-        const location =
-          await Location.getCurrentPositionAsync(
-            {
-              accuracy:
-                Location.Accuracy.High,
-            }
-          );
-
-        const latitude =
-          Number(
-            location.coords.latitude
-          );
-
-        const longitude =
-          Number(
-            location.coords.longitude
-          );
-
-        // SAVE TASK
-
-        await addDoc(
-          collection(
-            db,
-            "tasks"
-          ),
-
-          {
-            title:
-              title.trim(),
-
-            description:
-              description.trim(),
-
-            reward:
-              rewardNumber + " kr ",
-
-            price:
-              rewardNumber,
-
-            urgent,
-
-            rating: 5,
-
-            image:
-              imageUrl,
-
-            latitude,
-
-            longitude,
-
-            category,
-
-            accepted: false,
-
-            completed: false,
-
-            trackingActive: false,
-
-            creatorName:
-              auth.currentUser
-                ?.displayName ||
-              "Bruker",
-
-            createdBy:
-              auth.currentUser?.uid,
-
-            ownerEmail:
-              auth.currentUser?.email,
-
-            status: "open",
-
-            createdAt:
-              Date.now(),
-          }
+        return Alert.alert(
+          "Mangler tittel"
         );
+      }
 
-        // RESET
+      if (
+        !reward.trim()
+      ) {
 
-        setTitle("");
-        setDescription("");
-        setReward("");
-        setImage(null);
-        setCategory("Annet");
-        setUrgent(false);
-
-        Alert.alert(
-          "Oppdrag publisert 🔥"
+        return Alert.alert(
+          "Mangler belønning"
         );
+      }
 
-        navigation.navigate(
-          "Tabs",
-          {
-            screen: "Home",
-          }
-        );
+      setLoading(true);
 
-      } catch (e) {
+      const rewardNumber =
+        Number(reward);
 
-        console.log(
-          "CREATE TASK ERROR:",
-          e
-        );
+      if (
+        isNaN(rewardNumber) ||
 
-        Alert.alert(
-          "Noe gikk galt"
-        );
+        rewardNumber < 50 ||
 
-      } finally {
+        rewardNumber > 50000
+      ) {
 
         setLoading(false);
+
+        return Alert.alert(
+          "Belønning må være mellom 50 og 50000 kr"
+        );
       }
-    };
+
+      let imageUrl = "";
+
+      if (image) {
+
+        imageUrl =
+          await uploadImage(
+            image
+          );
+      }
+
+      // LOCATION
+
+      const { status } =
+        await Location.requestForegroundPermissionsAsync();
+
+      if (
+        status !==
+        "granted"
+      ) {
+
+        Alert.alert(
+          "Lokasjon kreves"
+        );
+
+        setLoading(false);
+
+        return;
+      }
+
+      const location =
+        await Location.getCurrentPositionAsync(
+          {
+            accuracy:
+              Location.Accuracy.High,
+          }
+        );
+
+      const latitude =
+        Number(
+          location.coords.latitude
+        );
+
+      const longitude =
+        Number(
+          location.coords.longitude
+        );
+
+      // SAVE TASK
+
+      await addDoc(
+        collection(
+          db,
+          "tasks"
+        ),
+
+        {
+          title:
+            title.trim(),
+
+          description:
+            description.trim(),
+
+          reward:
+            rewardNumber + " kr",
+
+          price:
+            rewardNumber,
+
+          urgent,
+
+          rating: 5,
+
+          image:
+            imageUrl,
+
+          latitude,
+
+          longitude,
+
+          category,
+
+          accepted: false,
+
+          completed: false,
+
+          trackingActive: false,
+
+          creatorName:
+            auth.currentUser
+              ?.displayName ||
+            "Bruker",
+
+          createdBy:
+            auth.currentUser?.uid,
+
+          ownerEmail:
+            auth.currentUser?.email,
+
+          status: "open",
+
+          createdAt:
+            Date.now(),
+        }
+      );
+
+      // RESET
+
+      setTitle("");
+      setDescription("");
+      setReward("");
+      setImage(null);
+      setCategory("Annet");
+      setUrgent(false);
+
+      Alert.alert(
+        "Oppdrag publisert 🔥"
+      );
+
+      navigation.navigate(
+        "Tabs",
+        {
+          screen: "Home",
+        }
+      );
+
+    } catch (e) {
+
+      console.log(
+        "CREATE TASK ERROR:",
+        e
+      );
+
+      Alert.alert(
+        "Firebase Error",
+        JSON.stringify(e)
+      );
+
+    } finally {
+
+      setLoading(false);
+    }
+};
 
   return (
 

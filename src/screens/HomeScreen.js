@@ -437,9 +437,9 @@ export default function HomeScreen({
                       styles.price
                     }
                   >
-                    {task.price ||
-                      task.reward ||
-                      0}
+                    {task.price
+                      ? `${task.price} kr`
+                      : task.reward || "0 kr"}
                   
                   </Text>
                 </View>
