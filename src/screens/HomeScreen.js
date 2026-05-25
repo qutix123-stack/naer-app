@@ -1,228 +1,133 @@
-import {
-  useEffect,
-  useState,
-  useContext,
-} from "react";
-
 import * as Location from "expo-location";
 
-import {
-  TaskContext,
-} from "../context/TaskContext";
+import React, {
+  useEffect,
+  useState,
+} from "react";
 
 import {
   View,
   Text,
-  TouchableOpacity,
-  Image,
-  FlatList,
-  ActivityIndicator,
-  TextInput,
+  StyleSheet,
   ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Image,
 } from "react-native";
 
-const categories = [
-  {
-    key: "all",
-    label: "Alle",
-  },
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+} from "firebase/firestore";
 
-  {
-    key: "Flytting",
-    label: "🚚 Flytting",
-  },
+import { Ionicons } from "@expo/vector-icons";
 
-  {
-    key: "Rengjøring",
-    label: "🧹 Rengjøring",
-  },
+import { db } from "../firebaseConfig";
 
-  {
-    key: "IT",
-    label: "💻 IT",
-  },
-
-  {
-    key: "Handling",
-    label: "🛒 Handling",
-  },
-
-  {
-    key: "Hage",
-    label: "🌳 Hage",
-  },
-
-  {
-    key: "Bæring",
-    label: "📦 Bæring",
-  },
-
-  {
-    key: "Dyrepass",
-    label: "🐶 Dyrepass",
-  },
-
-  {
-    key: "Annet",
-    label: "🔧 Annet",
-  },
-];
-
-const getDistance = (
-  lat1,
-  lon1,
-  lat2,
-  lon2
-) => {
-  const R = 6371;
-
-  const dLat =
-    ((lat2 - lat1) *
-      Math.PI) /
-    180;
-
-  const dLon =
-    ((lon2 - lon1) *
-      Math.PI) /
-    180;
-
-  const a =
-    Math.sin(
-      dLat / 2
-    ) *
-      Math.sin(
-        dLat / 2
-      ) +
-    Math.cos(
-      (lat1 *
-        Math.PI) /
-        180
-    ) *
-      Math.cos(
-        (lat2 *
-          Math.PI) /
-          180
-      ) *
-      Math.sin(
-        dLon /
-          2
-      ) *
-      Math.sin(
-        dLon /
-          2
-      );
-
-  const c =
-    2 *
-    Math.atan2(
-      Math.sqrt(a),
-      Math.sqrt(
-        1 - a
-      )
-    );
-
-  return R * c;
-};
+import colors from "../theme/colors";
+import AppCard from "../components/AppCard";
 
 export default function HomeScreen({
   navigation,
 }) {
-  const {
-    tasks,
-    loading,
-  } =
-    useContext(
-      TaskContext
+  const [tasks, setTasks] =
+    useState([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [
+    userLocation,
+    setUserLocation,
+  ] = useState(null);
+
+  useEffect(() => {
+    getUserLocation();
+
+    const q = query(
+      collection(db, "tasks"),
+      orderBy("createdAt", "desc")
     );
 
-  const [location, setLocation] =
-    useState(null);
+    const unsubscribe =
+      onSnapshot(q, (snapshot) => {
+        const taskList = [];
 
-  const [search, setSearch] =
-    useState("");
+        snapshot.forEach((doc) => {
+          taskList.push({
+            id: doc.id,
+            ...doc.data(),
+          });
+        });
 
-  const [filter, setFilter] =
-    useState("all");
+        setTasks(taskList);
+        setLoading(false);
+      });
 
-  // 🔥 LIVE LOCATION
-  useEffect(() => {
-    let subscription;
-
-    const getLocation =
-      async () => {
-        try {
-          const { status } =
-            await Location.requestForegroundPermissionsAsync();
-
-          if (
-            status !==
-            "granted"
-          ) {
-            return;
-          }
-
-          const currentLocation =
-            await Location.getCurrentPositionAsync(
-              {
-                accuracy:
-                  Location.Accuracy.High,
-              }
-            );
-
-          setLocation(
-            currentLocation.coords
-          );
-
-          subscription =
-            await Location.watchPositionAsync(
-              {
-                accuracy:
-                  Location.Accuracy.High,
-
-                timeInterval: 5000,
-
-                distanceInterval: 10,
-              },
-
-              (
-                newLocation
-              ) => {
-                setLocation(
-                  newLocation.coords
-                );
-              }
-            );
-        } catch (e) {
-          console.log(e);
-        }
-      };
-
-    getLocation();
-
-    return () => {
-      if (
-        subscription
-      ) {
-        subscription.remove();
-      }
-    };
+    return unsubscribe;
   }, []);
 
-  // 🔥 TIME AGO
+  // USER LOCATION
+
+  const getUserLocation =
+    async () => {
+      try {
+        const { status } =
+          await Location.requestForegroundPermissionsAsync();
+
+        if (
+          status !== "granted"
+        ) {
+          return;
+        }
+
+        const location =
+          await Location.getCurrentPositionAsync(
+            {}
+          );
+
+        setUserLocation({
+          latitude:
+            location.coords
+              .latitude,
+
+          longitude:
+            location.coords
+              .longitude,
+        });
+      } catch (e) {
+        console.log(
+          "LOCATION ERROR:",
+          e
+        );
+      }
+    };
+
+  // TIME AGO
+
   const getTimeAgo = (
     timestamp
   ) => {
     if (!timestamp)
       return "Nettopp";
 
-    const now =
-      Date.now();
+    let time = timestamp;
 
-    const time =
+    // FIRESTORE TIMESTAMP
+
+    if (
+      typeof timestamp ===
+        "object" &&
       timestamp?.seconds
-        ? timestamp.seconds *
-          1000
-        : timestamp;
+    ) {
+      time =
+        timestamp.seconds *
+        1000;
+    }
+
+    const now = Date.now();
 
     const diff =
       now - time;
@@ -232,616 +137,428 @@ export default function HomeScreen({
         diff / 60000
       );
 
-    if (
-      minutes < 1
-    )
-      return "Nettopp";
-
-    if (
-      minutes < 60
-    )
-      return `${minutes} min siden`;
-
     const hours =
       Math.floor(
         minutes / 60
       );
-
-    if (
-      hours < 24
-    )
-      return `${hours} t siden`;
 
     const days =
       Math.floor(
         hours / 24
       );
 
-    return `${days} dager siden`;
+    if (minutes < 1)
+      return "Nettopp";
+
+    if (minutes < 60)
+      return `${minutes} min siden`;
+
+    if (hours < 24)
+      return `${hours} t siden`;
+
+    return `${days} d siden`;
   };
 
-  // 🔥 FILTER TASKS
-  const filteredTasks =
-    [...tasks]
-      .filter(
-        (task) =>
-          !task.completed
-      )
-      .filter(
-        (task) => {
-          if (
-            filter ===
-            "all"
-          ) {
-            return true;
-          }
+  // REAL DISTANCE
 
-          return (
-            task.category ===
-            filter
-          );
-        }
-      )
-      .filter(
-        (task) =>
-          task.title
-            ?.toLowerCase()
-            .includes(
-              search.toLowerCase()
-            ) ||
+  const getDistance = (
+    lat1,
+    lon1,
+    lat2,
+    lon2
+  ) => {
+    if (
+      !lat1 ||
+      !lon1 ||
+      !lat2 ||
+      !lon2
+    )
+      return 9999;
 
-          task.description
-            ?.toLowerCase()
-            .includes(
-              search.toLowerCase()
-            )
-      )
-      .sort((a, b) => {
-        if (
-          !location ||
-          a.latitude ==
-            null ||
-          a.longitude ==
-            null ||
-          b.latitude ==
-            null ||
-          b.longitude ==
-            null
-        ) {
-          return 0;
-        }
+    const R = 6371;
 
-        const distA =
-          getDistance(
-            location.latitude,
-            location.longitude,
-            a.latitude,
-            a.longitude
-          );
+    const dLat =
+      ((lat2 - lat1) *
+        Math.PI) /
+      180;
 
-        const distB =
-          getDistance(
-            location.latitude,
-            location.longitude,
-            b.latitude,
-            b.longitude
-          );
+    const dLon =
+      ((lon2 - lon1) *
+        Math.PI) /
+      180;
 
-        return (
-          distA - distB
+    const a =
+      Math.sin(dLat / 2) *
+        Math.sin(dLat / 2) +
+      Math.cos(
+        (lat1 *
+          Math.PI) /
+          180
+      ) *
+        Math.cos(
+          (lat2 *
+            Math.PI) /
+            180
+        ) *
+        Math.sin(
+          dLon / 2
+        ) *
+        Math.sin(
+          dLon / 2
         );
-      });
 
-  // 🔥 TASK CARD
-  const renderTask =
-    ({ item }) => (
-      <TouchableOpacity
-        onPress={() =>
-          navigation.navigate(
-            "TaskDetail",
-            {
-              task: item,
-            }
-          )
-        }
-        style={{
-          backgroundColor:
-            "white",
+    const c =
+      2 *
+      Math.atan2(
+        Math.sqrt(a),
+        Math.sqrt(1 - a)
+      );
 
-          borderRadius: 28,
-
-          marginBottom: 20,
-
-          overflow:
-            "hidden",
-
-          shadowColor:
-            "#000",
-
-          shadowOpacity: 0.08,
-
-          shadowRadius: 10,
-
-          elevation: 4,
-        }}
-      >
-        {item.image ? (
-          <Image
-            source={{
-              uri: item.image,
-            }}
-            style={{
-              width:
-                "100%",
-
-              height: 220,
-            }}
-          />
-        ) : null}
-
-        <View
-          style={{
-            padding: 20,
-          }}
-        >
-          {/* BADGES */}
-          <View
-            style={{
-              flexDirection:
-                "row",
-
-              flexWrap:
-                "wrap",
-
-              marginBottom: 12,
-            }}
-          >
-            {/* CATEGORY */}
-            <View
-              style={{
-                backgroundColor:
-                  "#EFF6FF",
-
-                paddingHorizontal: 12,
-
-                paddingVertical: 6,
-
-                borderRadius: 99,
-
-                marginRight: 10,
-
-                marginBottom: 8,
-              }}
-            >
-              <Text
-                style={{
-                  color:
-                    "#2563EB",
-
-                  fontWeight:
-                    "bold",
-                }}
-              >
-                {item.category ||
-                  "Annet"}
-              </Text>
-            </View>
-
-            {item.urgent && (
-              <View
-                style={{
-                  backgroundColor:
-                    "#FEE2E2",
-
-                  paddingHorizontal: 12,
-
-                  paddingVertical: 6,
-
-                  borderRadius: 99,
-
-                  marginRight: 10,
-
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color:
-                      "#DC2626",
-
-                    fontWeight:
-                      "bold",
-                  }}
-                >
-                  🔥 Haster
-                </Text>
-              </View>
-            )}
-
-            {item.accepted && (
-              <View
-                style={{
-                  backgroundColor:
-                    "#DCFCE7",
-
-                  paddingHorizontal: 12,
-
-                  paddingVertical: 6,
-
-                  borderRadius: 99,
-
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color:
-                      "#16A34A",
-
-                    fontWeight:
-                      "bold",
-                  }}
-                >
-                  🟢 Pågår
-                </Text>
-              </View>
-            )}
-          </View>
-
-          <Text
-            style={{
-              fontSize: 24,
-
-              fontWeight:
-                "bold",
-
-              color:
-                "#111827",
-
-              marginBottom: 10,
-            }}
-          >
-            {item.title}
-          </Text>
-
-          <Text
-            numberOfLines={
-              2
-            }
-            style={{
-              color:
-                "#6B7280",
-
-              fontSize: 16,
-
-              lineHeight: 24,
-
-              marginBottom: 18,
-            }}
-          >
-            {item.description}
-          </Text>
-
-          <View
-            style={{
-              flexDirection:
-                "row",
-
-              justifyContent:
-                "space-between",
-
-              alignItems:
-                "center",
-            }}
-          >
-            <View>
-              <Text
-                style={{
-                  color:
-                    "#22C55E",
-
-                  fontSize: 22,
-
-                  fontWeight:
-                    "bold",
-                }}
-              >
-                {item.reward}
-              </Text>
-
-              <Text
-                style={{
-                  color:
-                    "#9CA3AF",
-
-                  marginTop: 4,
-                }}
-              >
-                {getTimeAgo(
-                  item.createdAt
-                )}
-              </Text>
-            </View>
-
-            {location &&
-            item.latitude !=
-              null &&
-            item.longitude !=
-              null ? (
-              <View
-                style={{
-                  backgroundColor:
-                    "#EFF6FF",
-
-                  paddingHorizontal: 14,
-
-                  paddingVertical: 10,
-
-                  borderRadius: 18,
-                }}
-              >
-                <Text
-                  style={{
-                    color:
-                      "#2563EB",
-
-                    fontWeight:
-                      "bold",
-                  }}
-                >
-                  📍{" "}
-                  {Math.round(
-                    getDistance(
-                      location.latitude,
-                      location.longitude,
-                      item.latitude,
-                      item.longitude
-                    ) * 1000
-                  )}m
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-
-  // 🔥 LOADING
-  if (
-    loading ||
-    !location
-  ) {
-    return (
-      <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-        }}
-      >
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text
-          style={{
-            marginTop: 20,
-
-            fontSize: 18,
-
-            color:
-              "#6B7280",
-          }}
-        >
-          Laster oppdrag...
-        </Text>
-      </View>
-    );
-  }
+    return R * c;
+  };
 
   return (
-    <View
-      style={{
-        flex: 1,
-
-        backgroundColor:
-          "#F4F6F8",
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{
+        paddingBottom: 120,
       }}
+      showsVerticalScrollIndicator={
+        false
+      }
     >
-      <FlatList
-        data={filteredTasks}
-        keyExtractor={(
-          item
-        ) => item.id}
-        showsVerticalScrollIndicator={
-          false
-        }
-        contentContainerStyle={{
-          padding: 20,
+      {/* HEADER */}
 
-          paddingTop: 70,
+      <View style={styles.header}>
+        <View>
+          <Image
+            source={require("../../assets/logo.png")}
+            style={styles.logo}
+          />
 
-          paddingBottom: 140,
-        }}
-        ListHeaderComponent={
-          <>
-            <Text
-              style={{
-                fontSize: 42,
+          <Text style={styles.location}>
+            Oppdrag nær deg
+          </Text>
+        </View>
 
-                fontWeight:
-                  "bold",
+        <TouchableOpacity>
+          <Ionicons
+            name="notifications-outline"
+            size={28}
+            color={colors.dark}
+          />
+        </TouchableOpacity>
+      </View>
 
-                color:
-                  "#111827",
-              }}
-            >
-              Oppdrag nær deg
-            </Text>
+      {/* HERO */}
 
-            <Text
-              style={{
-                fontSize: 18,
+      <View
+        style={styles.heroContainer}
+      >
+        <TouchableOpacity
+          style={
+            styles.needHelpCard
+          }
+          onPress={() =>
+            navigation.navigate(
+            "CreateTask"
+            )
+          }
+        >
+          <Text
+            style={styles.heroTitle}
+          >
+            Trenger hjelp
+          </Text>
 
-                color:
-                  "#6B7280",
+          <Text
+            style={
+              styles.heroSubtitle
+            }
+          >
+            Opprett et oppdrag
+          </Text>
+        </TouchableOpacity>
 
-                marginTop: 8,
+        <TouchableOpacity
+            style={
+            styles.canHelpCard
+            }
 
-                marginBottom: 25,
-              }}
-            >
-              Finn hjelp eller tjen penger 🚀
-            </Text>
+            onPress={() =>
+            navigation.navigate(
+            "Tasks"
+            )
+            }
+        >
+          <Text
+            style={styles.heroTitle}
+          >
+            Kan hjelpe
+          </Text>
 
-            {/* SEARCH */}
-            <TextInput
-              placeholder="Søk etter oppdrag..."
-              value={search}
-              onChangeText={
-                setSearch
+          <Text
+            style={
+              styles.heroSubtitle
+            }
+          >
+            Se oppdrag nær deg
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* SECTION */}
+
+      <View
+        style={styles.sectionHeader}
+      >
+        <Text
+          style={styles.sectionTitle}
+        >
+          Aktive oppdrag
+        </Text>
+      </View>
+
+      {/* LOADING */}
+
+      {loading ? (
+        <ActivityIndicator
+          size="large"
+          color={colors.primary}
+          style={{
+            marginTop: 40,
+          }}
+        />
+      ) : tasks.length === 0 ? (
+        <Text
+          style={styles.emptyText}
+        >
+          Ingen oppdrag enda
+        </Text>
+      ) : (
+        tasks
+          .sort((a, b) => {
+            if (
+              !userLocation
+            )
+              return 0;
+
+            const distA =
+              getDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                a.latitude,
+                a.longitude
+              );
+
+            const distB =
+              getDistance(
+                userLocation.latitude,
+                userLocation.longitude,
+                b.latitude,
+                b.longitude
+              );
+
+            return (
+              distA - distB
+            );
+          })
+          .map((task) => (
+            <TouchableOpacity
+              key={task.id}
+              onPress={() =>
+                navigation.navigate(
+                  "Tasks",
+                  {
+                    task,
+                  }
+                )
               }
-              style={{
-                backgroundColor:
-                  "white",
-
-                padding: 18,
-
-                borderRadius: 20,
-
-                marginBottom: 18,
-
-                fontSize: 16,
-              }}
-            />
-
-            {/* CATEGORY FILTERS */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={
-                false
-              }
-              style={{
-                marginBottom: 25,
-              }}
             >
-              {categories.map(
-                (
-                  item
-                ) => (
-                  <TouchableOpacity
-                    key={
-                      item.key
-                    }
-                    onPress={() =>
-                      setFilter(
-                        item.key
-                      )
-                    }
+              <AppCard
+                style={
+                  styles.taskCard
+                }
+              >
+                <View
+                  style={
+                    styles.taskRow
+                  }
+                >
+                  <View
                     style={{
-                      backgroundColor:
-                        filter ===
-                        item.key
-                          ? "#2563EB"
-                          : "white",
-
-                      paddingHorizontal: 18,
-
-                      paddingVertical: 12,
-
-                      borderRadius: 20,
-
-                      marginRight: 12,
+                      flex: 1,
+                      marginRight: 10,
                     }}
                   >
                     <Text
-                      style={{
-                        color:
-                          filter ===
-                          item.key
-                            ? "white"
-                            : "#111827",
+                      style={
+                        styles.taskTitle
+                      }
+                    >
+                      {task.title}
+                    </Text>
 
-                        fontWeight:
-                          "bold",
-                      }}
+                    <Text
+                      style={
+                        styles.taskDescription
+                      }
+                      numberOfLines={
+                        2
+                      }
                     >
                       {
-                        item.label
+                        task.description
                       }
                     </Text>
-                  </TouchableOpacity>
-                )
-              )}
-            </ScrollView>
-          </>
-        }
-        renderItem={
-          renderTask
-        }
-      />
 
-      {/* FLOAT BUTTON */}
-      <TouchableOpacity
-        onPress={() =>
-          navigation.navigate(
-            "Opprett"
-          )
-        }
-        style={{
-          position:
-            "absolute",
+                    <Text
+                      style={
+                        styles.taskDistance
+                      }
+                    >
+                      {Math.round(
+                        getDistance(
+                          userLocation?.latitude,
+                          userLocation?.longitude,
+                          task.latitude,
+                          task.longitude
+                        )
+                      )}{" "}
+                      km unna •{" "}
+                      {getTimeAgo(
+                        task.createdAt
+                      )}
+                    </Text>
+                  </View>
 
-          right: 25,
-
-          bottom: 110,
-
-          backgroundColor:
-            "#2563EB",
-
-          width: 72,
-
-          height: 72,
-
-          borderRadius: 36,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          shadowColor:
-            "#000",
-
-          shadowOpacity: 0.2,
-
-          shadowRadius: 10,
-
-          elevation: 8,
-        }}
-      >
-        <Text
-          style={{
-            color:
-              "white",
-
-            fontSize: 42,
-
-            marginTop: -2,
-          }}
-        >
-          +
-        </Text>
-      </TouchableOpacity>
-    </View>
+                  <Text
+                    style={
+                      styles.price
+                    }
+                  >
+                    {task.price ||
+                      task.reward ||
+                      0}
+                  
+                  </Text>
+                </View>
+              </AppCard>
+            </TouchableOpacity>
+          ))
+      )}
+    </ScrollView>
   );
 }
+
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        colors.background,
+      paddingHorizontal: 20,
+      paddingTop: 60,
+    },
+
+    header: {
+      flexDirection: "row",
+      justifyContent:
+        "space-between",
+      alignItems: "center",
+      marginBottom: 30,
+    },
+
+    logo: {
+      width: 150,
+      height: 60,
+    },
+
+    location: {
+      fontSize: 16,
+      color: colors.gray,
+      marginTop: 4,
+    },
+
+    heroContainer: {
+      gap: 16,
+      marginBottom: 30,
+    },
+
+    needHelpCard: {
+      backgroundColor:
+        "#ff5f57",
+      padding: 24,
+      borderRadius: 24,
+    },
+
+    canHelpCard: {
+      backgroundColor:
+        "#22c55e",
+      padding: 24,
+      borderRadius: 24,
+    },
+
+    heroTitle: {
+      color: "#fff",
+      fontSize: 24,
+      fontWeight: "700",
+      marginBottom: 6,
+    },
+
+    heroSubtitle: {
+      color: "#fff",
+      fontSize: 16,
+    },
+
+    sectionHeader: {
+      marginBottom: 20,
+    },
+
+    sectionTitle: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: colors.dark,
+    },
+
+    taskCard: {
+      marginBottom: 16,
+    },
+
+    taskRow: {
+      flexDirection: "row",
+      justifyContent:
+        "space-between",
+      alignItems: "center",
+    },
+
+    taskTitle: {
+      fontSize: 18,
+      fontWeight: "700",
+      color: colors.dark,
+      marginBottom: 6,
+    },
+
+    taskDescription: {
+      color: colors.gray,
+      marginBottom: 8,
+    },
+
+    taskDistance: {
+      color: colors.gray,
+      fontSize: 14,
+    },
+
+    price: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: "#22c55e",
+    },
+
+    emptyText: {
+      textAlign: "center",
+      marginTop: 50,
+      color: colors.gray,
+      fontSize: 16,
+    },
+  });

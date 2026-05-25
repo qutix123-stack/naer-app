@@ -4,42 +4,44 @@
     "slug": "naer-app",
     "version": "1.0.0",
     "orientation": "portrait",
-
     "userInterfaceStyle": "light",
-
     "splash": {
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "image": "./assets/logo.png",
+      "contentFit": "contain",
+      "backgroundColor": "#F8FAFC"
     },
-
     "assetBundlePatterns": [
       "**/*"
     ],
-
     "android": {
       "package": "com.naer.app",
-
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
       ],
-
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyB9WovNfpDfF_lCSGR2-her8uhmhWutP54"
         }
       }
     },
-
     "plugins": [
-      "expo-notifications"
-    ],
+  "expo-notifications",
+  "expo-font",
+
+  [
+    "expo-image-picker",
+    {
+      "photosPermission":
+        "Appen trenger tilgang til bilder."
+    }
+  ]
+],
 
     "notification": {
       "icon": "./assets/icon.png",
       "color": "#2563EB"
     },
-
     "extra": {
       "eas": {
         "projectId": "41c3bb48-ee73-471e-8053-688e1bf60b62"

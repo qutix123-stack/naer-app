@@ -1,12 +1,8 @@
 import React, {
   useState,
-  useContext,
 } from "react";
 
-import { TaskContext } from "../context/TaskContext";
-
 import {
-  View,
   Text,
   TextInput,
   TouchableOpacity,
@@ -14,59 +10,48 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  View,
+  Switch,
 } from "react-native";
 
 import * as ImagePicker from "expo-image-picker";
-
 import * as Location from "expo-location";
 
-import { auth } from "../firebaseConfig";
+import {
+  collection,
+  addDoc,
+} from "firebase/firestore";
+
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
+
+import {
+  auth,
+  db,
+} from "../firebaseConfig";
+
+const storage =
+  getStorage();
 
 const categories = [
-  {
-    label: "🚚 Flytting",
-    value: "Flytting",
-  },
-
-  {
-    label: "🧹 Rengjøring",
-    value: "Rengjøring",
-  },
-
-  {
-    label: "💻 IT",
-    value: "IT",
-  },
-
-  {
-    label: "🛒 Handling",
-    value: "Handling",
-  },
-
-  {
-    label: "🌳 Hage",
-    value: "Hage",
-  },
-
-  {
-    label: "📦 Bæring",
-    value: "Bæring",
-  },
-
-  {
-    label: "🐶 Dyrepass",
-    value: "Dyrepass",
-  },
-
-  {
-    label: "🔧 Annet",
-    value: "Annet",
-  },
+  { label: "🚚 Flytting", value: "Flytting" },
+  { label: "🧹 Rengjøring", value: "Rengjøring" },
+  { label: "💻 IT", value: "IT" },
+  { label: "🛒 Handling", value: "Levering" },
+  { label: "🌳 Hage", value: "Hage" },
+  { label: "📦 Bæring", value: "Bæring" },
+  { label: "🐶 Dyrepass", value: "Dyrepass" },
+  { label: "🔧 Annet", value: "Annet" },
 ];
 
 export default function CreateTaskScreen({
   navigation,
 }) {
+
   const [title, setTitle] =
     useState("");
 
@@ -85,36 +70,56 @@ export default function CreateTaskScreen({
   const [category, setCategory] =
     useState("Annet");
 
-  const { addTask } =
-    useContext(TaskContext);
+  const [urgent, setUrgent] =
+    useState(false);
 
-  // 🔥 IMAGE PICKER
+  // IMAGE PICKER
+
   const pickImage =
     async () => {
+
       try {
-        const result =
-          await ImagePicker.launchImageLibraryAsync(
-            {
-              mediaTypes:
-                ImagePicker.MediaType.Images,
 
-              allowsEditing: true,
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-              aspect: [4, 3],
+        if (
+          !permission.granted
+        ) {
 
-              quality: 0.4,
-            }
+          Alert.alert(
+            "Gi tilgang til bilder"
           );
+
+          return;
+        }
+
+        const result =
+  await ImagePicker.launchImageLibraryAsync(
+    {
+      mediaTypes:
+        ["images"],
+
+      allowsEditing:
+        true,
+
+      aspect: [4, 3],
+
+      quality: 0.7,
+    }
+  );
 
         if (
           !result.canceled
         ) {
+
           setImage(
-            result.assets[0]
-              .uri
+            result.assets[0].uri
           );
         }
+
       } catch (e) {
+
         console.log(e);
 
         Alert.alert(
@@ -123,13 +128,62 @@ export default function CreateTaskScreen({
       }
     };
 
-  // 🔥 CREATE TASK
+  // UPLOAD IMAGE
+
+  const uploadImage =
+    async (uri) => {
+
+      try {
+
+        const response =
+          await fetch(uri);
+
+        const blob =
+          await response.blob();
+
+        const filename =
+          `task_${Date.now()}`;
+
+        const storageRef =
+          ref(
+            storage,
+            `tasks/${filename}`
+          );
+
+        await uploadBytes(
+          storageRef,
+          blob
+        );
+
+        const downloadURL =
+          await getDownloadURL(
+            storageRef
+          );
+
+        return downloadURL;
+
+      } catch (e) {
+
+        console.log(
+          "UPLOAD ERROR:",
+          e
+        );
+
+        return "";
+      }
+    };
+
+  // CREATE TASK
+
   const handleCreateTask =
     async () => {
+
       try {
+
         if (
           !title.trim()
         ) {
+
           return Alert.alert(
             "Mangler tittel"
           );
@@ -138,121 +192,172 @@ export default function CreateTaskScreen({
         if (
           !reward.trim()
         ) {
-          return Alert.alert(
-            "Mangler belønning"
+
+          const rewardNumber =
+            Number(reward);
+
+              if (
+              isNaN(rewardNumber) ||
+
+                rewardNumber < 50 ||
+
+                rewardNumber > 50000
+            ) {
+
+                setLoading(false);
+
+                return Alert.alert(
+                 "Belønning må være mellom 50 og 50000 kr"
+                  );
+              }
+        }
+
+        setLoading(true);
+
+        let imageUrl = "";
+
+        if (image) {
+
+          imageUrl =
+            await uploadImage(
+              image
+            );
+        }
+
+        // LOCATION
+
+        const { status } =
+          await Location.requestForegroundPermissionsAsync();
+
+        if (
+          status !==
+          "granted"
+        ) {
+
+          Alert.alert(
+            "Lokasjon kreves"
           );
+
+          setLoading(false);
+
+          return;
         }
 
-        setLoading(
-          true
-        );
+        const location =
+          await Location.getCurrentPositionAsync(
+            {
+              accuracy:
+                Location.Accuracy.High,
+            }
+          );
 
-        let latitude =
-          null;
+        const latitude =
+          Number(
+            location.coords.latitude
+          );
 
-        let longitude =
-          null;
+        const longitude =
+          Number(
+            location.coords.longitude
+          );
 
-        // 🔥 LOCATION
-        try {
-          const {
-            status,
-          } =
-            await Location.requestForegroundPermissionsAsync();
+        // SAVE TASK
 
-          if (
-            status ===
-            "granted"
-          ) {
-            const location =
-              await Location.getCurrentPositionAsync(
-                {
-                  accuracy:
-                    Location.Accuracy.High,
-                }
-              );
+        await addDoc(
+          collection(
+            db,
+            "tasks"
+          ),
 
-            latitude =
-              location
-                .coords
-                .latitude;
+          {
+            title:
+              title.trim(),
 
-            longitude =
-              location
-                .coords
-                .longitude;
+            description:
+              description.trim(),
+
+            reward:
+              rewardNumber + " kr ",
+
+            price:
+              rewardNumber,
+
+            urgent,
+
+            rating: 5,
+
+            image:
+              imageUrl,
+
+            latitude,
+
+            longitude,
+
+            category,
+
+            accepted: false,
+
+            completed: false,
+
+            trackingActive: false,
+
+            creatorName:
+              auth.currentUser
+                ?.displayName ||
+              "Bruker",
+
+            createdBy:
+              auth.currentUser?.uid,
+
+            ownerEmail:
+              auth.currentUser?.email,
+
+            status: "open",
+
+            createdAt:
+              Date.now(),
           }
-        } catch (e) {
-          console.log(e);
-        }
+        );
 
-        // 🔥 CREATE TASK
-        await addTask({
-          title,
+        // RESET
 
-          description,
-
-          reward:
-            reward +
-            " kr",
-
-          urgent: true,
-
-          image:
-            image || "",
-
-          latitude,
-
-          longitude,
-
-          category,
-
-          creatorName:
-            auth
-              .currentUser
-              ?.displayName ||
-
-            "Bruker",
-        });
-
-        // 🔥 RESET
         setTitle("");
-
-        setDescription(
-          ""
-        );
-
+        setDescription("");
         setReward("");
-
-        setImage(
-          null
-        );
-
-        setCategory(
-          "Annet"
-        );
+        setImage(null);
+        setCategory("Annet");
+        setUrgent(false);
 
         Alert.alert(
           "Oppdrag publisert 🔥"
         );
 
         navigation.navigate(
-          "Hjem"
+          "Tabs",
+          {
+            screen: "Home",
+          }
         );
+
       } catch (e) {
-        console.log(e);
+
+        console.log(
+          "CREATE TASK ERROR:",
+          e
+        );
 
         Alert.alert(
           "Noe gikk galt"
         );
+
       } finally {
-        setLoading(
-          false
-        );
+
+        setLoading(false);
       }
     };
 
   return (
+
     <ScrollView
       style={{
         flex: 1,
@@ -260,96 +365,43 @@ export default function CreateTaskScreen({
         backgroundColor:
           "#F4F6F8",
       }}
+
       contentContainerStyle={{
         padding: 20,
 
         paddingTop: 60,
 
-        paddingBottom: 60,
+        paddingBottom: 140,
       }}
+
       showsVerticalScrollIndicator={
         false
       }
     >
-      {/* IMAGE */}
-      <TouchableOpacity
-        onPress={
-          pickImage
-        }
-        activeOpacity={
-          0.8
-        }
-        style={{
-          backgroundColor:
-            "white",
 
-          padding: 20,
-
-          borderRadius: 24,
-
-          alignItems:
-            "center",
-
-          marginBottom: 24,
-        }}
-      >
-        {image ? (
-          <Image
-            source={{
-              uri: image,
-            }}
-            style={{
-              width:
-                "100%",
-
-              height: 220,
-
-              borderRadius: 20,
-            }}
-          />
-        ) : (
-          <Text
-            style={{
-              fontSize: 18,
-
-              color:
-                "#2563EB",
-
-              fontWeight:
-                "bold",
-            }}
-          >
-            📸 Legg til bilde
-          </Text>
-        )}
-      </TouchableOpacity>
-
-      {/* TITLE */}
       <Text
         style={{
-          fontSize: 34,
+          fontSize: 38,
 
-          fontWeight:
-            "bold",
+          fontWeight: "bold",
+
+          color: "#111827",
 
           marginBottom: 30,
-
-          color:
-            "#111827",
         }}
       >
         Opprett oppdrag
       </Text>
 
       {/* CATEGORY */}
+
       <Text
         style={{
           fontSize: 18,
 
           marginBottom: 14,
 
-          color:
-            "#374151",
+          color: "#374151",
         }}
       >
         Kategori
@@ -357,32 +409,34 @@ export default function CreateTaskScreen({
 
       <ScrollView
         horizontal
+
         showsHorizontalScrollIndicator={
           false
         }
+
         style={{
-          marginBottom: 28,
+          marginBottom: 24,
         }}
       >
+
         {categories.map(
-          (
-            item
-          ) => (
+          (item) => (
+
             <TouchableOpacity
-              key={
-                item.value
-              }
+              key={item.value}
+
               onPress={() =>
                 setCategory(
                   item.value
                 )
               }
+
               style={{
                 backgroundColor:
                   category ===
                   item.value
                     ? "#2563EB"
-                    : "white",
+                    : "#FFFFFF",
 
                 paddingHorizontal: 18,
 
@@ -393,103 +447,82 @@ export default function CreateTaskScreen({
                 marginRight: 12,
               }}
             >
+
               <Text
                 style={{
                   color:
                     category ===
                     item.value
-                      ? "white"
+                      ? "#FFFFFF"
                       : "#111827",
 
-                  fontWeight:
-                    "bold",
+                  fontWeight: "700",
                 }}
               >
-                {
-                  item.label
-                }
+                {item.label}
               </Text>
+
             </TouchableOpacity>
           )
         )}
+
       </ScrollView>
 
       {/* TITLE */}
-      <Text
-        style={{
-          fontSize: 18,
-
-          marginBottom: 10,
-
-          color:
-            "#374151",
-        }}
-      >
-        Tittel
-      </Text>
 
       <TextInput
+        maxLength={40}
+
         value={title}
-        onChangeText={
-          setTitle
-        }
+
+        onChangeText={setTitle}
+
         placeholder="Hva trenger du hjelp til?"
-        maxLength={
-          60
-        }
+
+        placeholderTextColor="#9CA3AF"
+
         style={{
           backgroundColor:
-            "white",
+            "#FFFFFF",
 
-          padding: 20,
+          padding: 22,
 
-          borderRadius: 20,
+          borderRadius: 24,
 
-          marginBottom: 25,
+          marginBottom: 20,
 
           fontSize: 18,
         }}
       />
 
       {/* DESCRIPTION */}
-      <Text
-        style={{
-          fontSize: 18,
-
-          marginBottom: 10,
-
-          color:
-            "#374151",
-        }}
-      >
-        Beskrivelse
-      </Text>
 
       <TextInput
-        value={
-          description
-        }
-        onChangeText={
-          setDescription
-        }
+        maxLength={180}
+
+        value={description}
+
+        onChangeText={setDescription}
+
         placeholder="Beskriv oppdraget..."
+
+        placeholderTextColor="#9CA3AF"
+
         multiline
-        maxLength={
-          500
-        }
+
         style={{
           backgroundColor:
-            "white",
+            "#FFFFFF",
 
-          padding: 20,
+          padding: 22,
 
-          borderRadius: 20,
+          borderRadius: 24,
 
-          marginBottom: 25,
+          marginBottom: 20,
 
           fontSize: 18,
 
-          height: 140,
+          height: 160,
 
           textAlignVertical:
             "top",
@@ -497,51 +530,160 @@ export default function CreateTaskScreen({
       />
 
       {/* REWARD */}
-      <Text
-        style={{
-          fontSize: 18,
-
-          marginBottom: 10,
-
-          color:
-            "#374151",
-        }}
-      >
-        Belønning
-      </Text>
 
       <TextInput
+
+        maxLength={5}
+
         value={reward}
-        onChangeText={
-          setReward
-        }
-        placeholder="150"
+
+        onChangeText={setReward}
+
+        placeholder="Belønning i kr"
+
+        placeholderTextColor="#9CA3AF"
+
         keyboardType="numeric"
-        maxLength={
-          6
-        }
+
         style={{
           backgroundColor:
-            "white",
+            "#FFFFFF",
 
-          padding: 20,
+          padding: 22,
 
-          borderRadius: 20,
+          borderRadius: 24,
 
-          marginBottom: 40,
+          marginBottom: 20,
 
           fontSize: 18,
         }}
       />
 
-      {/* BUTTON */}
+      {/* URGENT */}
+
+      <View
+        style={{
+          backgroundColor:
+            "#FFFFFF",
+
+          padding: 22,
+
+          borderRadius: 24,
+
+          marginBottom: 20,
+
+          flexDirection: "row",
+
+          alignItems: "center",
+
+          justifyContent:
+            "space-between",
+        }}
+      >
+
+        <View>
+
+          <Text
+            style={{
+              fontSize: 18,
+
+              fontWeight: "700",
+
+              color: "#111827",
+            }}
+          >
+            Haster
+          </Text>
+
+          <Text
+            style={{
+              color: "#6B7280",
+
+              marginTop: 4,
+            }}
+          >
+            Vis oppdraget høyere
+          </Text>
+
+        </View>
+
+        <Switch
+          value={urgent}
+
+          onValueChange={
+            setUrgent
+          }
+        />
+
+      </View>
+
+      {/* IMAGE BUTTON */}
+
       <TouchableOpacity
-        disabled={
-          loading
-        }
+        onPress={pickImage}
+
+        style={{
+          backgroundColor:
+            "#111827",
+
+          padding: 20,
+
+          borderRadius: 24,
+
+          alignItems: "center",
+
+          marginBottom: 20,
+        }}
+      >
+
+        <Text
+          style={{
+            color: "#FFFFFF",
+
+            fontSize: 17,
+
+            fontWeight: "700",
+          }}
+        >
+          {image
+            ? "✓ Bilde valgt"
+            : "📷 Last opp bilde"}
+        </Text>
+
+      </TouchableOpacity>
+
+      {/* IMAGE */}
+
+      {image && (
+
+        <Image
+          source={{
+            uri: image,
+          }}
+
+          style={{
+            width: "100%",
+
+            height: 240,
+
+            borderRadius: 24,
+
+            marginBottom: 24,
+          }}
+
+          resizeMode="cover"
+        />
+      )}
+
+      {/* BUTTON */}
+
+      <TouchableOpacity
+        disabled={loading}
+
         onPress={
           handleCreateTask
         }
+
         style={{
           backgroundColor:
             loading
@@ -550,30 +692,37 @@ export default function CreateTaskScreen({
 
           padding: 24,
 
-          borderRadius: 24,
+          borderRadius: 28,
 
-          alignItems:
-            "center",
+          alignItems: "center",
+
+          marginTop: 10,
         }}
       >
+
         {loading ? (
-          <ActivityIndicator color="white" />
+
+          <ActivityIndicator
+            color="white"
+          />
+
         ) : (
+
           <Text
             style={{
-              color:
-                "white",
+              color: "#FFFFFF",
 
               fontSize: 22,
 
-              fontWeight:
-                "bold",
+              fontWeight: "bold",
             }}
           >
             Publiser oppdrag
           </Text>
         )}
+
       </TouchableOpacity>
+
     </ScrollView>
   );
 }

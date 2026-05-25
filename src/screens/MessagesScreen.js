@@ -1,5 +1,7 @@
 import React from "react";
 
+import SkeletonMessageCard from "../components/SkeletonMessageCard";
+
 import {
   View,
   Text,
@@ -201,40 +203,23 @@ export default function MessagesScreen({
     };
 
   // 🔥 LOADING
-  if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-        }}
-      >
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text
-          style={{
-            marginTop: 20,
-
-            color:
-              "#6B7280",
-          }}
-        >
-          Laster meldinger...
-        </Text>
-      </View>
-    );
-  }
+   // 🔥 LOADING
+if (loading) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: "#F4F6F8",
+        paddingTop: 60,
+        paddingHorizontal: 20,
+      }}
+    >
+      <SkeletonMessageCard />
+      <SkeletonMessageCard />
+      <SkeletonMessageCard />
+    </View>
+  );
+}
 
   return (
     <View
@@ -326,14 +311,9 @@ export default function MessagesScreen({
                 }
                 onPress={() => {
                   try {
-                    navigation.navigate(
-                      "Chat",
-
-                      {
-                        task:
-                          item,
-                      }
-                    );
+                    navigation.navigate("Chat", {
+  taskId: item.id,
+})
                   } catch (e) {
                     console.log(
                       "CHAT NAV ERROR:",

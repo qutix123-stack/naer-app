@@ -8,11 +8,11 @@ import React, {
 import {
   collection,
   onSnapshot,
-  addDoc,
   updateDoc,
   doc,
-  serverTimestamp,
   getDoc,
+  addDoc,
+  serverTimestamp,
 } from "firebase/firestore";
 
 import {
@@ -48,62 +48,112 @@ export function TaskProvider({
     useRef({});
 
   // 🔥 REALTIME TASKS
-  useEffect(() => {
-    const unsubscribe =
-      onSnapshot(
-        collection(
-          db,
-          "tasks"
-        ),
+useEffect(() => {
 
-        (snapshot) => {
-          const firestoreTasks =
-            snapshot.docs.map(
-              (document) => ({
-                id: document.id,
-                ...document.data(),
-              })
-            );
+  // 🔥 WAIT FOR AUTH
+  const unsubscribeAuth =
+    auth.onAuthStateChanged(
+      (user) => {
 
-          setTasks(
-            firestoreTasks
-          );
+        // 🔥 NOT LOGGED IN YET
+        if (!user) {
 
-          setLoading(
-            false
-          );
-        },
-
-        (error) => {
           console.log(
-            error
+            "AUTH NOT READY"
           );
 
-          setLoading(
-            false
-          );
+          setTasks([]);
+
+          setLoading(false);
+
+          return;
         }
-      );
 
-    return () => {
-      unsubscribe();
+        console.log(
+          "AUTH READY:",
+          user.uid
+        );
 
-      // 🔥 CLEANUP TRACKERS
-      Object.values(
-        trackingSubscriptions.current
-      ).forEach(
-        (
+        // 🔥 REALTIME TASKS
+        const unsubscribeTasks =
+          onSnapshot(
+            collection(
+              db,
+              "tasks"
+            ),
+
+            (snapshot) => {
+
+              const firestoreTasks =
+                snapshot.docs.map(
+                  (
+                    document
+                  ) => ({
+                    id:
+                      document.id,
+
+                    ...document.data(),
+                  })
+                );
+
+              console.log(
+                "LOADED TASKS:",
+                firestoreTasks.length
+              );
+
+              setTasks(
+                firestoreTasks
+              );
+
+              setLoading(
+                false
+              );
+            },
+
+            (error) => {
+
+              console.log(
+                "TASK ERROR:",
+                error
+              );
+
+              setTasks([]);
+
+              setLoading(
+                false
+              );
+            }
+          );
+
+        // 🔥 CLEANUP TASKS
+        return () => {
+          unsubscribeTasks();
+        };
+      }
+    );
+
+  // 🔥 CLEANUP EVERYTHING
+  return () => {
+
+    unsubscribeAuth();
+
+    Object.values(
+      trackingSubscriptions.current
+    ).forEach(
+      (
+        subscription
+      ) => {
+
+        if (
           subscription
-        ) => {
-          if (
-            subscription
-          ) {
-            subscription.remove();
-          }
+        ) {
+          subscription.remove();
         }
-      );
-    };
-  }, []);
+      }
+    );
+  };
+
+}, []);
 
   // 🔥 IMAGE UPLOAD
   const uploadImage =
@@ -151,6 +201,36 @@ export function TaskProvider({
         return "";
       }
     };
+
+    // 🔥 ACTIVITY FEED
+const addActivity =
+  async (text) => {
+
+    try {
+
+      await addDoc(
+        collection(
+          db,
+          "activity"
+        ),
+
+        {
+          text,
+
+          createdAt:
+            serverTimestamp(),
+        }
+      );
+
+      await addActivity(
+  `🆕 ${task.creatorName} la ut "${task.title}"`
+);
+
+    } catch (e) {
+
+      console.log(e);
+    }
+  };
 
   // 🔥 ADD TASK
   const addTask =
@@ -261,6 +341,9 @@ export function TaskProvider({
               task.creatorName ||
               "Bruker",
 
+              creatorRating:
+              task.creatorRating || 5,
+
             createdAt:
               serverTimestamp(),
           }
@@ -316,7 +399,7 @@ export function TaskProvider({
           await Location.getCurrentPositionAsync(
             {
               accuracy:
-                Location.Accuracy.High,
+                Location.Accuracy.Balaced,
             }
           );
 
@@ -362,6 +445,14 @@ export function TaskProvider({
             acceptedAt:
               serverTimestamp(),
           }
+        );
+
+        await addActivity(
+        `✅ Oppdrag fullført`
+        );
+
+        await addActivity(
+        `🤝 ${helperName} aksepterte "${taskData?.title || "et oppdrag"}"`
         );
 
         // 🔥 SEND PUSH
@@ -410,7 +501,7 @@ export function TaskProvider({
           await Location.watchPositionAsync(
             {
               accuracy:
-                Location.Accuracy.High,
+                Location.Accuracy.Balanced,
 
               timeInterval: 5000,
 

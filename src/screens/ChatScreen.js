@@ -1,696 +1,850 @@
-import {
-  useEffect,
+import React, {
   useState,
+  useEffect,
   useRef,
 } from "react";
 
 import {
   doc,
-  setDoc,
-  updateDoc,
+  getDoc,
+} from "firebase/firestore";
+
+import {
+  sendPushNotification,
+} from "../utils/sendPushNotification";
+
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  FlatList,
+  KeyboardAvoidingView,
+  Platform,
+  SafeAreaView,
+  Image,
+} from "react-native";
+
+import {
   collection,
   addDoc,
   onSnapshot,
   query,
   orderBy,
   serverTimestamp,
-  deleteDoc,
 } from "firebase/firestore";
 
-import { db, auth } from "../firebaseConfig";
-
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  KeyboardAvoidingView,
-  Platform,
-  ActivityIndicator,
-  Alert,
-} from "react-native";
+  auth,
+  db,
+} from "../firebaseConfig";
 
 export default function ChatScreen({
   route,
+  navigation,
 }) {
-  const task =
-    route?.params?.task;
+
+  const taskId =
+    route?.params?.taskId;
 
   const [messages, setMessages] =
     useState([]);
 
-  const [message, setMessage] =
+  const [text, setText] =
     useState("");
 
-  const [typingUsers, setTypingUsers] =
-    useState({});
-
-  const [loading, setLoading] =
-    useState(true);
+  const [otherUser, setOtherUser] =
+    useState("Bruker");
 
   const flatListRef =
-    useRef();
+    useRef(null);
 
-  // INVALID TASK
-  if (
-    !task ||
-    !task.id
-  ) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent:
-            "center",
-          alignItems:
-            "center",
-          backgroundColor:
-            "#F4F6F8",
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 18,
-            color:
-              "#6B7280",
-          }}
-        >
-          Chat not available
-        </Text>
-      </View>
+  useEffect(() => {
+
+    loadOtherUser();
+
+    if (!taskId) return;
+
+    const q = query(
+      collection(
+        db,
+        "tasks",
+        taskId,
+        "messages"
+      ),
+
+      orderBy(
+        "createdAt",
+        "asc"
+      )
     );
-  }
 
-  // REALTIME MESSAGES
-  useEffect(() => {
-    try {
-      const q = query(
-        collection(
-          db,
-          "messages"
-        ),
+    const unsubscribe =
+      onSnapshot(
+        q,
+        (snapshot) => {
 
-        orderBy(
-          "createdAt",
-          "asc"
-        )
-      );
+          const loaded = [];
 
-      const unsubscribe =
-        onSnapshot(
-          q,
+          snapshot.forEach(
+            (doc) => {
 
-          (
-            snapshot
-          ) => {
-            try {
-              const loadedMessages =
-                snapshot.docs
-                  .map(
-                    (
-                      document
-                    ) => ({
-                      id:
-                        document.id,
+              loaded.push({
+                id: doc.id,
+                ...doc.data(),
+              });
 
-                      ...document.data(),
-                    })
-                  )
-                  .filter(
-                    (
-                      msg
-                    ) =>
-                      msg &&
-                      msg.taskId ===
-                        task.id
-                  );
-
-              setMessages(
-                loadedMessages
-              );
-
-              setLoading(
-                false
-              );
-            } catch (e) {
-              console.log(
-                "MESSAGE LOAD ERROR:",
-                e
-              );
-
-              setLoading(
-                false
-              );
             }
-          },
+          );
 
-          (error) => {
-            console.log(
-              "SNAPSHOT ERROR:",
-              error
+          setMessages(
+            loaded
+          );
+
+          setTimeout(() => {
+
+            flatListRef.current?.scrollToEnd(
+              {
+                animated: true,
+              }
             );
 
-            setLoading(
-              false
-            );
-          }
-        );
-
-      return unsubscribe;
-    } catch (e) {
-      console.log(
-        "CHAT ERROR:",
-        e
-      );
-
-      setLoading(
-        false
-      );
-    }
-  }, [task.id]);
-
-  // AUTO SCROLL
-  useEffect(() => {
-    setTimeout(() => {
-      flatListRef.current?.scrollToEnd(
-        {
-          animated: true,
+          }, 100);
         }
       );
-    }, 100);
-  }, [messages]);
 
-  // TYPING LISTENER
-  useEffect(() => {
-    try {
-      const unsubscribe =
-        onSnapshot(
-          doc(
-            db,
-            "typing",
-            task.id
-          ),
+    return unsubscribe;
 
-          (
-            docSnap
-          ) => {
-            if (
-              docSnap.exists()
-            ) {
-              setTypingUsers(
-                docSnap.data()
-              );
-            }
-          }
-        );
+  }, [taskId]);
 
-      return unsubscribe;
-    } catch (e) {
-      console.log(
-        "TYPING ERROR:",
-        e
-      );
-    }
-  }, [task.id]);
+  const loadOtherUser =
+    async () => {
 
-  // SEND MESSAGE
+      try {
+
+        const taskSnap =
+          await getDoc(
+            doc(
+              db,
+              "tasks",
+              taskId
+            )
+          );
+
+        const task =
+          taskSnap.data();
+
+        if (!task)
+          return;
+
+        if (
+          task.createdBy ===
+          auth.currentUser.uid
+        ) {
+
+          setOtherUser(
+            task.acceptedBy ||
+            "Hjelper"
+          );
+
+        } else {
+
+          setOtherUser(
+            task.creatorName ||
+            "Bruker"
+          );
+
+        }
+
+      } catch (e) {
+
+        console.log(e);
+
+      }
+    };
+
   const sendMessage =
     async () => {
+
+       const cleaned =
+        text
+          .replace(
+            /\s+/g,
+            " "
+          )
+          .trim();
+
+      if (
+        !cleaned ||
+
+        cleaned.length > 300
+        )
+        return;
+
       try {
-        if (
-          !message.trim()
-        ) {
-          return;
-        }
-
-        const textToSend =
-          message.trim();
-
-        setMessage("");
 
         await addDoc(
           collection(
             db,
+            "tasks",
+            taskId,
             "messages"
           ),
 
           {
             text:
-              textToSend,
+              cleaned,
+
+            senderId:
+              auth.currentUser
+                ?.uid || "",
+
+            senderName:
+              auth.currentUser
+                ?.displayName ||
+
+              auth.currentUser
+                ?.email ||
+
+              "Bruker",
 
             createdAt:
               serverTimestamp(),
-
-            sender:
-              auth
-                .currentUser
-                ?.email,
-
-            senderName:
-              auth.currentUser?.email?.split(
-                "@"
-              )[0] ||
-              "Bruker",
-
-            senderId:
-              auth
-                .currentUser
-                ?.uid,
-
-            taskId:
-              task.id,
           }
         );
 
-        await setDoc(
-          doc(
-            db,
-            "typing",
-            task.id
-          ),
+        try {
 
-          {
-            [auth
-              .currentUser
-              ?.uid]:
-              false,
-          },
+          const taskRef =
+            await getDoc(
+              doc(
+                db,
+                "tasks",
+                taskId
+              )
+            );
 
-          {
-            merge: true,
+          const taskData =
+            taskRef.data();
+
+          let otherUserId =
+            null;
+
+          if (
+            taskData.createdBy ===
+            auth.currentUser.uid
+          ) {
+
+            otherUserId =
+              taskData.acceptedById;
+
+          } else {
+
+            otherUserId =
+              taskData.createdBy;
+
           }
-        );
-      } catch (e) {
-        console.log(
-          "SEND ERROR:",
-          e
-        );
-      }
-    };
 
-  // HANDLE TYPING
-  const handleTyping =
-    async (
-      text
-    ) => {
-      try {
-        setMessage(
-          text
-        );
+          if (
+            otherUserId
+          ) {
 
-        await setDoc(
-          doc(
-            db,
-            "typing",
-            task.id
-          ),
+            const userRef =
+              await getDoc(
+                doc(
+                  db,
+                  "users",
+                  otherUserId
+                )
+              );
 
-          {
-            [auth
-              .currentUser
-              ?.uid]:
-              text.length >
-              0,
-          },
+            const userData =
+              userRef.data();
 
-          {
-            merge: true,
+            if (
+              userData?.pushToken
+            ) {
+
+              await sendPushNotification(
+                userData.pushToken,
+
+                `💬 ${auth.currentUser.displayName}`,
+
+                text
+              );
+            }
           }
-        );
-      } catch (e) {
-        console.log(
-          "TYPING SAVE ERROR:",
-          e
-        );
-      }
-    };
 
-  // DELETE MESSAGE
-  const deleteMessage =
-    async (
-      messageId
-    ) => {
-      try {
-        if (
-          !messageId
-        ) {
-          return;
+        } catch (e) {
+
+          console.log(
+            "NOTIFICATION ERROR:",
+            e
+          );
+
         }
 
-        await deleteDoc(
-          doc(
-            db,
-            "messages",
-            messageId
-          )
-        );
+        setText("");
+
+        setTimeout(() => {
+
+          flatListRef.current?.scrollToEnd(
+            {
+              animated: true,
+            }
+          );
+
+        }, 100);
+
       } catch (e) {
-        console.log(
-          "DELETE ERROR:",
-          e
-        );
+
+        console.log(e);
+
       }
     };
 
-  // LONG PRESS
-  const handleLongPress =
-    (item) => {
-      if (
-        !item ||
-        !item.id
-      ) {
-        return;
+  const getTime = (
+    timestamp
+  ) => {
+
+    if (
+      !timestamp?.seconds
+    )
+      return "";
+
+    const date =
+      new Date(
+        timestamp.seconds *
+        1000
+      );
+
+    return date.toLocaleTimeString(
+      [],
+      {
+        hour: "2-digit",
+        minute: "2-digit",
       }
+    );
+  };
 
-      Alert.alert(
-        "Melding",
+  const renderItem =
+    ({ item }) => {
 
-        "Vil du slette meldingen?",
+      const isMine =
+        item.senderId ===
+        auth.currentUser?.uid;
 
-        [
-          {
-            text:
-              "Avbryt",
+      return (
 
-            style:
-              "cancel",
-          },
+        <View
+          style={[
+            styles.messageWrapper,
 
-          {
-            text:
-              "Slett",
+            isMine
+              ? styles.myWrapper
+              : styles.otherWrapper,
+          ]}
+        >
 
-            style:
-              "destructive",
+          {!isMine && (
 
-            onPress:
-              () =>
-                deleteMessage(
-                  item.id
-                ),
-          },
-        ]
+            <View
+              style={
+                styles.avatar
+              }
+            >
+
+              <Text
+                style={{
+                  color: "white",
+                  fontWeight:
+                    "bold",
+                }}
+              >
+                {
+                  item.senderName?.charAt(
+                    0
+                  ) || "B"
+                }
+              </Text>
+
+            </View>
+          )}
+
+          <View
+            style={[
+              styles.messageBubble,
+
+              isMine
+                ? styles.myBubble
+                : styles.otherBubble,
+            ]}
+          >
+
+            {!isMine && (
+
+              <Text
+                style={
+                  styles.senderName
+                }
+              >
+                {
+                  item.senderName ||
+                  "Bruker"
+                }
+              </Text>
+            )}
+
+            <Text
+
+            numberOfLines={12}
+
+            ellipsizeMode="tail"
+
+              style={[
+
+                styles.messageText,
+
+                {
+                  color:
+                    isMine
+                      ? "white"
+                      : "#111827",
+                },
+              ]}
+            >
+              {item.text}
+            </Text>
+
+            <Text
+              style={[
+                styles.time,
+
+                {
+                  color:
+                    isMine
+                      ? "rgba(255,255,255,0.7)"
+                      : "#6B7280",
+                },
+              ]}
+            >
+              {
+                getTime(
+                  item.createdAt
+                )
+              }
+            </Text>
+
+            {item.image && (
+
+              <Image
+                source={{
+                  uri:
+                    item.image,
+                }}
+                style={
+                  styles.image
+                }
+              />
+            )}
+
+          </View>
+
+        </View>
       );
     };
 
-  // LOADING
-  if (loading) {
-    return (
-      <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-        }}
-      >
-        <ActivityIndicator
-          size="large"
-          color="#2563EB"
-        />
-
-        <Text
-          style={{
-            marginTop: 20,
-
-            color:
-              "#6B7280",
-          }}
-        >
-          Laster chat...
-        </Text>
-      </View>
-    );
-  }
-
   return (
-    <KeyboardAvoidingView
-      style={{
-        flex: 1,
-      }}
-      behavior={
-        Platform.OS ===
-        "ios"
-          ? "padding"
-          : "height"
-      }
-      keyboardVerticalOffset={
-        Platform.OS ===
-        "ios"
-          ? 90
-          : 20
+
+    <SafeAreaView
+      style={
+        styles.container
       }
     >
-      <View
-        style={{
-          flex: 1,
 
-          backgroundColor:
-            "#F4F6F8",
-        }}
-      >
+      <KeyboardAvoidingView
+  behavior={
+    Platform.OS === "ios"
+      ? "padding"
+      : "height"
+  }
+
+  keyboardVerticalOffset={
+    Platform.OS === "ios"
+      ? 0
+      : 20
+  }
+
+  style={{
+    flex: 1,
+  }}
+>
+
         {/* HEADER */}
-        {message.length ===
-          0 && (
-          <View
-            style={{
-              paddingTop: 60,
 
-              paddingHorizontal: 20,
-
-              paddingBottom: 18,
-
-              backgroundColor:
-                "white",
-
-              borderBottomWidth: 1,
-
-              borderBottomColor:
-                "#E5E7EB",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 24,
-
-                fontWeight:
-                  "bold",
-
-                color:
-                  "#111827",
-              }}
-            >
-              {task.createdBy ===
-              auth
-                .currentUser
-                ?.uid
-                ? task.acceptedByName ||
-                  task.acceptedBy ||
-                  "Hjelper"
-                : task.creatorName ||
-                  task.createdByName ||
-                  task.email?.split(
-                    "@"
-                  )[0] ||
-                  "Bruker"}
-            </Text>
-          </View>
-        )}
-
-        {/* MESSAGES */}
-        <FlatList
-          ref={flatListRef}
-          data={messages}
-          keyExtractor={(
-            item,
-            index
-          ) =>
-            item?.id
-              ? item.id.toString()
-              : index.toString()
+        <View
+          style={
+            styles.header
           }
-          contentContainerStyle={{
-            padding: 20,
-            paddingBottom: 40,
-          }}
+        >
+
+          <TouchableOpacity
+            onPress={() =>
+              navigation.goBack()
+            }
+          >
+
+            <Text
+              style={
+                styles.back
+              }
+            >
+              ←
+            </Text>
+
+          </TouchableOpacity>
+
+          <View>
+
+            <Text
+              style={
+                styles.headerTitle
+              }
+            >
+              {otherUser}
+            </Text>
+
+            <Text
+              style={
+                styles.online
+              }
+            >
+              Aktiv nå
+            </Text>
+
+          </View>
+
+        </View>
+
+        {/* CHAT */}
+
+        <FlatList
+
+          keyboardShouldPersistTaps="handled"
+
+          ref={flatListRef}
+
+          data={messages}
+
+          keyExtractor={(
+            item
+          ) => item.id}
+
+          renderItem={
+            renderItem
+          }
+
           showsVerticalScrollIndicator={
             false
           }
-          renderItem={({
-            item,
-          }) => {
-            if (
-              !item
-            ) {
-              return null;
-            }
 
-            return (
-              <TouchableOpacity
-                activeOpacity={
-                  0.8
-                }
-                onLongPress={() =>
-                  handleLongPress(
-                    item
-                  )
-                }
-                style={{
-                  backgroundColor:
-                    item.senderId ===
-                    auth
-                      .currentUser
-                      ?.uid
-                      ? "#2563EB"
-                      : "#E5E7EB",
-
-                  padding: 14,
-
-                  borderRadius: 18,
-
-                  marginBottom: 10,
-
-                  alignSelf:
-                    item.senderId ===
-                    auth
-                      .currentUser
-                      ?.uid
-                      ? "flex-end"
-                      : "flex-start",
-
-                  maxWidth:
-                    "80%",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-
-                    marginBottom: 4,
-
-                    fontWeight:
-                      "bold",
-
-                    color:
-                      item.senderId ===
-                      auth
-                        .currentUser
-                        ?.uid
-                        ? "#DCEBFF"
-                        : "#6B7280",
-                  }}
-                >
-                  {item.senderName ||
-                    "Bruker"}
-                </Text>
-
-                <Text
-                  style={{
-                    color:
-                      item.senderId ===
-                      auth
-                        .currentUser
-                        ?.uid
-                        ? "white"
-                        : "black",
-
-                    fontSize: 16,
-                  }}
-                >
-                  {item.text ||
-                    ""}
-                </Text>
-              </TouchableOpacity>
-            );
+          contentContainerStyle={{
+            padding: 16,
+            paddingBottom: 120,
           }}
         />
 
         {/* INPUT */}
+
         <View
-          style={{
-            flexDirection:
-              "row",
-
-            padding: 12,
-
-            paddingBottom:
-              Platform.OS ===
-              "ios"
-                ? 25
-                : 10,
-
-            backgroundColor:
-              "white",
-
-            borderTopWidth: 1,
-
-            borderTopColor:
-              "#E5E7EB",
-          }}
+          style={
+            styles.inputContainer
+          }
         >
+
           <TextInput
-            value={message}
-            onChangeText={
-              handleTyping
-            }
-            placeholder="Skriv melding..."
             multiline
-            maxLength={
-              500
+            maxLength={300}
+            placeholder="Skriv melding..."
+
+            value={text}
+
+            onChangeText={
+              setText
             }
-            style={{
-              flex: 1,
 
-              backgroundColor:
-                "#F3F4F6",
+            style={
+              styles.input
+            }
 
-              padding: 14,
-
-              borderRadius: 20,
-
-              marginRight: 10,
-
-              maxHeight: 120,
-            }}
+            placeholderTextColor="#9CA3AF"
           />
 
           <TouchableOpacity
+            style={
+              styles.sendButton
+            }
+
             onPress={
               sendMessage
             }
-            style={{
-              backgroundColor:
-                "#2563EB",
-
-              paddingHorizontal: 20,
-
-              justifyContent:
-                "center",
-
-              borderRadius: 20,
-            }}
           >
-            <Text
-              style={{
-                color:
-                  "white",
 
-                fontWeight:
-                  "bold",
-              }}
+            <Text
+              style={
+                styles.sendText
+              }
             >
               Send
             </Text>
+
           </TouchableOpacity>
+
         </View>
-      </View>
-    </KeyboardAvoidingView>
+
+      </KeyboardAvoidingView>
+
+    </SafeAreaView>
   );
 }
+
+const styles =
+  StyleSheet.create({
+
+    container: {
+      flex: 1,
+      backgroundColor:
+        "#F3F4F6",
+    },
+
+    header: {
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      paddingHorizontal: 20,
+
+      paddingTop: 18,
+
+      paddingBottom: 16,
+
+      backgroundColor:
+        "white",
+
+      borderBottomWidth: 1,
+
+      borderColor:
+        "#E5E7EB",
+    },
+
+    back: {
+      fontSize: 34,
+
+      marginRight: 18,
+
+      color:
+        "#111827",
+    },
+
+    headerTitle: {
+      fontSize: 22,
+
+      fontWeight:
+        "bold",
+
+      color:
+        "#111827",
+    },
+
+    online: {
+      color:
+        "#22C55E",
+
+      marginTop: 2,
+    },
+
+    messageWrapper: {
+      marginBottom: 14,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "flex-end",
+    },
+
+    myWrapper: {
+      justifyContent:
+        "flex-end",
+    },
+
+    otherWrapper: {
+      justifyContent:
+        "flex-start",
+    },
+
+    avatar: {
+      width: 34,
+
+      height: 34,
+
+      borderRadius: 17,
+
+      backgroundColor:
+        "#2563EB",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      marginRight: 8,
+    },
+
+    messageBubble: {
+      maxWidth: "78%",
+
+      borderRadius: 30,
+
+      padding: 16,
+    },
+
+    myBubble: {
+      backgroundColor:
+        "#2563EB",
+
+      borderBottomRightRadius: 8,
+
+      marginLeft: "auto",
+    },
+
+    otherBubble: {
+      backgroundColor:
+        "white",
+
+      borderBottomLeftRadius: 8,
+    },
+
+    senderName: {
+      fontSize: 14,
+
+      fontWeight:
+        "bold",
+
+      marginBottom: 6,
+
+      color:
+        "#6B7280",
+    },
+
+    messageText: {
+      fontSize: 17,
+
+      lineHeight: 24,
+    },
+
+    time: {
+      fontSize: 12,
+
+      marginTop: 8,
+
+      alignSelf:
+        "flex-end",
+    },
+
+    image: {
+      width: 220,
+
+      height: 220,
+
+      borderRadius: 18,
+
+      marginTop: 10,
+    },
+
+    inputContainer: {
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      paddingHorizontal: 16,
+
+      paddingTop: 12,
+
+      paddingBottom:
+        Platform.OS === "ios"
+          ? 28
+          : 46,
+
+      backgroundColor:
+        "white",
+
+      borderTopWidth: 1,
+
+      borderColor:
+        "#E5E7EB",
+    },
+
+    input: {
+      flex: 1,
+
+      backgroundColor:
+        "#F3F4F6",
+
+      borderRadius: 20,
+
+      paddingHorizontal: 18,
+
+      minHeight: 58,
+
+      maxHeight: 120,
+
+      fontSize: 17,
+
+      marginRight: 10,
+
+      color:
+        "#111827",
+    },
+
+    sendButton: {
+      backgroundColor:
+        "#2563EB",
+
+      shadowColor:
+        "#2563EB",
+
+      shadowOpacity: 0.25,
+
+      shadowRadius: 8,
+
+      elevation: 6,
+
+      paddingHorizontal: 24,
+
+      height: 58,
+
+      borderRadius: 20,
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+    },
+
+    sendText: {
+      color: "white",
+
+      fontWeight:
+        "bold",
+
+      fontSize: 17,
+    },
+  });

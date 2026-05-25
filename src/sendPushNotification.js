@@ -1,48 +1,37 @@
-export default async function sendPushNotification(
+export async function sendPushNotification(
   expoPushToken,
   title,
   body
 ) {
-  try {
-    const message = {
-      to: expoPushToken,
 
-      sound: "default",
+  const message = {
+    to: expoPushToken,
 
-      title,
+    sound: "default",
 
-      body,
+    title,
 
-      data: {
-        someData:
-          "goes here",
+    body,
+  };
+
+  await fetch(
+    "https://exp.host/--/api/v2/push/send",
+    {
+      method: "POST",
+
+      headers: {
+        Accept: "application/json",
+
+        "Accept-encoding":
+          "gzip, deflate",
+
+        "Content-Type":
+          "application/json",
       },
-    };
 
-    await fetch(
-      "https://exp.host/--/api/v2/push/send",
-
-      {
-        method: "POST",
-
-        headers: {
-          Accept:
-            "application/json",
-
-          "Accept-encoding":
-            "gzip, deflate",
-
-          "Content-Type":
-            "application/json",
-        },
-
-        body:
-          JSON.stringify(
-            message
-          ),
-      }
-    );
-  } catch (e) {
-    console.log(e);
-  }
+      body: JSON.stringify(
+        message
+      ),
+    }
+  );
 }

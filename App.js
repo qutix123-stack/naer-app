@@ -1,4 +1,4 @@
-import "./src/firebaseConfig";
+import TasksScreen from "./src/screens/TasksScreen";
 
 import {
   useEffect,
@@ -6,11 +6,22 @@ import {
   useRef,
 } from "react";
 
+import * as SplashScreen
+from "expo-splash-screen";
+
+SplashScreen.preventAutoHideAsync();
+
+import BottomTabs from "./src/navigation/BottomTabs";
+
 import {
   View,
   Text,
   Platform,
+  Animated,
 } from "react-native";
+
+import { Image }
+from "expo-image";
 
 import {
   Ionicons,
@@ -63,9 +74,9 @@ import CreateTaskScreen from "./src/screens/CreateTaskScreen";
 import ChatScreen from "./src/screens/ChatScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 
-import * as Notifications from "expo-notifications";
+// import * as Notifications from "expo-notifications";
 
-import registerForPushNotificationsAsync from "./src/registerForPushNotifications";
+// import registerForPushNotificationsAsync from "./src/registerForPushNotifications";
 
 const Stack =
   createNativeStackNavigator();
@@ -73,7 +84,7 @@ const Stack =
 const Tab =
   createBottomTabNavigator();
 
-// 🔥 CUSTOM NAV THEME
+// THEME
 const MyTheme = {
   ...DefaultTheme,
 
@@ -85,8 +96,8 @@ const MyTheme = {
   },
 };
 
-// 🔥 FOREGROUND NOTIFICATIONS
-Notifications.setNotificationHandler(
+// FOREGROUND NOTIFICATIONS
+/*Notifications.setNotificationHandler(
   {
     handleNotification:
       async () => ({
@@ -100,8 +111,9 @@ Notifications.setNotificationHandler(
           false,
       }),
   }
-);
+); */
 
+// TABS
 function Tabs() {
   return (
     <Tab.Navigator
@@ -123,42 +135,35 @@ function Tabs() {
           bottom:
             Platform.OS ===
             "ios"
-              ? 30
-              : 20,
+              ? 28
+              : 18,
 
-          left: 20,
+          left: 18,
 
-          right: 20,
+          right: 18,
 
           elevation: 0,
 
           backgroundColor:
             "white",
 
-          borderRadius: 30,
+          borderRadius: 28,
 
-          height: 82,
+          height: 78,
 
           shadowColor:
             "#000",
 
-          shadowOpacity: 0.1,
+          shadowOpacity: 0.08,
 
           shadowRadius: 16,
 
           shadowOffset: {
             width: 0,
-
             height: 10,
           },
 
           borderTopWidth: 0,
-
-          paddingBottom:
-            Platform.OS ===
-            "ios"
-              ? 10
-              : 0,
         },
 
         tabBarIcon: ({
@@ -177,12 +182,21 @@ function Tabs() {
 
           } else if (
             route.name ===
-            "Kart"
+            "Map"
           ) {
             iconName =
               focused
                 ? "map"
                 : "map-outline";
+
+          } else if (
+            route.name ===
+            "Opprett"
+          ) {
+            iconName =
+              focused
+                ? "add-circle"
+                : "add-circle-outline";
 
           } else if (
             route.name ===
@@ -195,59 +209,17 @@ function Tabs() {
 
           } else if (
             route.name ===
-            "Varsler"
-          ) {
-            iconName =
-              focused
-                ? "notifications"
-                : "notifications-outline";
-
-          } else if (
-            route.name ===
             "Profil"
           ) {
             iconName =
               focused
                 ? "person"
                 : "person-outline";
-
-          } else if (
-            route.name ===
-            "Mine"
-          ) {
-            iconName =
-              focused
-                ? "briefcase"
-                : "briefcase-outline";
-
-          } else if (
-            route.name ===
-            "Opprett"
-          ) {
-            iconName =
-              focused
-                ? "add-circle"
-                : "add-circle-outline";
           }
 
           return (
             <View
               style={{
-                backgroundColor:
-                  focused
-                    ? "#DBEAFE"
-                    : "transparent",
-
-                width: focused
-                  ? 54
-                  : 42,
-
-                height: focused
-                  ? 54
-                  : 42,
-
-                borderRadius: 27,
-
                 justifyContent:
                   "center",
 
@@ -255,6 +227,20 @@ function Tabs() {
                   "center",
               }}
             >
+
+              <View
+                style={{
+                   transform: [
+                {
+                  scale:
+                    focused
+                    ? 1.15
+                    : 1,
+                  },
+            ],
+              }}
+            >
+
               <Ionicons
                 name={
                   iconName
@@ -270,6 +256,7 @@ function Tabs() {
                     : "#9CA3AF"
                 }
               />
+              </View>
             </View>
           );
         },
@@ -281,29 +268,36 @@ function Tabs() {
       />
 
       <Tab.Screen
-        name="Kart"
+        name="Map"
         component={MapScreen}
       />
 
       <Tab.Screen
         name="Opprett"
-        component={CreateTaskScreen}
+        component={
+          CreateTaskScreen
+        }
       />
 
       <Tab.Screen
         name="Meldinger"
-        component={MessagesScreen}
+        component={
+          MessagesScreen
+        }
       />
 
       <Tab.Screen
         name="Profil"
-        component={ProfileScreen}
+        component={
+          ProfileScreen
+        }
       />
     </Tab.Navigator>
   );
 }
 
 export default function App() {
+
   const [user, setUser] =
     useState(null);
 
@@ -316,13 +310,43 @@ export default function App() {
   const responseListener =
     useRef();
 
-  // 🔥 PUSH NOTIFICATIONS
+  const [appReady, setAppReady] =
+  useState(false);
+
   useEffect(() => {
+
+  const prepare =
+    async () => {
+
+      await new Promise(
+        (resolve) =>
+          setTimeout(
+            resolve,
+            1800
+          )
+      );
+
+      setAppReady(true);
+
+      await SplashScreen.hideAsync();
+    };
+
+  prepare();
+
+}, []);
+
+  // PUSH NOTIFICATIONS
+  /*useEffect(() => {
     registerForPushNotificationsAsync()
       .then(
         async (
           token
         ) => {
+          console.log(
+            "PUSH TOKEN:",
+            token
+          );
+
           if (
             token &&
             auth
@@ -345,6 +369,7 @@ export default function App() {
               );
             } catch (e) {
               console.log(
+                "TOKEN ERROR:",
                 e
               );
             }
@@ -358,6 +383,7 @@ export default function App() {
           notification
         ) => {
           console.log(
+            "NOTIFICATION:",
             notification
           );
         }
@@ -369,23 +395,19 @@ export default function App() {
           response
         ) => {
           console.log(
+            "RESPONSE:",
             response
           );
         }
       );
 
     return () => {
-      Notifications.removeNotificationSubscription(
-        notificationListener.current
-      );
+  notificationListener.current?.remove();
+  responseListener.current?.remove();
+};
+  }, []); */
 
-      Notifications.removeNotificationSubscription(
-        responseListener.current
-      );
-    };
-  }, []);
-
-  // 🔥 AUTH
+  // AUTH
   useEffect(() => {
     const unsubscribe =
       onAuthStateChanged(
@@ -406,7 +428,7 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // 🔥 PREMIUM LOADING SCREEN
+  // LOADING SCREEN
   if (loading) {
     return (
       <View
@@ -443,11 +465,16 @@ export default function App() {
             marginBottom: 30,
           }}
         >
-          <Ionicons
-            name="flash"
-            size={52}
-            color="#2563EB"
+          <Image
+          source={require("./assets/logo.png")}
+
+          style={{
+            width: 140,
+            height: 140,
+            contentFit: "contain",
+          }}
           />
+
         </View>
 
         <Text
@@ -505,6 +532,27 @@ export default function App() {
                   fontWeight:
                     "bold",
                 },
+
+                tabBarStyle: {
+                position: "absolute",
+
+                height: 86,
+
+                borderTopWidth: 0,
+
+                backgroundColor:
+                "rgba(255,255,255,0.92)",
+
+                shadowColor:
+                "#000",
+
+                shadowOpacity: 0.08,
+
+                shadowRadius: 12,
+
+                elevation: 8,
+            },
+              
             }}
           >
             {user ? (
@@ -546,32 +594,29 @@ export default function App() {
                 ChatScreen
               }
               options={{
-                title:
-                  "Chat",
+                headerShown: false,
               }}
             />
 
             <Stack.Screen
-              name="Help"
+              name="Tasks"
               component={
-                CreateTaskScreen
-              }
+                TasksScreen}
+                        
               options={{
-                title:
-                  "Opprett oppdrag",
+              headerShown: false,
               }}
             />
 
             <Stack.Screen
-              name="Helper"
+              name="CreateTask"
               component={
-                HelperScreen
-              }
+                CreateTaskScreen}
               options={{
-                title:
-                  "Hjelper",
+              headerShown: false,
               }}
             />
+
           </Stack.Navigator>
         </NavigationContainer>
       </TaskProvider>
