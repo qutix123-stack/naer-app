@@ -29,8 +29,51 @@ export default function TaskDetailScreen({
   navigation,
 }) {
 
-  const { taskId } =
-    route.params;
+  const taskId =
+    route?.params?.taskId;
+
+  console.log(
+    "TASK ID:",
+    taskId
+  );
+
+  console.log(
+    "TYPEOF TASKID:",
+    typeof taskId
+  );
+
+  if (!taskId) {
+
+    return (
+
+      <View
+        style={{
+          flex: 1,
+
+          justifyContent:
+            "center",
+
+          alignItems:
+            "center",
+
+          backgroundColor:
+            "#F4F6F8",
+        }}
+      >
+
+        <Text
+          style={{
+            fontSize: 18,
+
+            color: "#111827",
+          }}
+        >
+          Task mangler ID
+        </Text>
+
+      </View>
+    );
+  }
 
   const [task, setTask] =
     useState(null);
@@ -50,29 +93,62 @@ export default function TaskDetailScreen({
 
         try {
 
+          console.log(
+            "FETCHING TASK:",
+            taskId
+          );
+
           const ref =
             doc(
               db,
               "tasks",
-              taskId
+              String(taskId)
             );
 
           const snapshot =
             await getDoc(ref);
 
+          console.log(
+            "SNAPSHOT EXISTS:",
+            snapshot.exists()
+          );
+
           if (
             snapshot.exists()
           ) {
+
+            const data =
+              snapshot.data();
+
+            console.log(
+              "TASK DATA:",
+              JSON.stringify(data)
+            );
 
             setTask({
               id:
                 snapshot.id,
 
-              ...snapshot.data(),
+              ...data,
             });
+
+          } else {
+
+            console.log(
+              "TASK NOT FOUND"
+            );
+
+            Alert.alert(
+              "Oppdrag finnes ikke"
+            );
           }
 
         } catch (e) {
+
+          console.log(
+            "TASK DETAIL ERROR FULL:",
+            JSON.stringify(e)
+          );
 
           console.log(
             "TASK DETAIL ERROR:",
@@ -100,6 +176,13 @@ export default function TaskDetailScreen({
 
       try {
 
+        if (!task?.id) {
+
+          return Alert.alert(
+            "Task mangler ID"
+          );
+        }
+
         setAccepting(true);
 
         await updateDoc(
@@ -117,6 +200,9 @@ export default function TaskDetailScreen({
 
             acceptedAt:
               Date.now(),
+
+            status:
+              "accepted",
           }
         );
 
@@ -231,7 +317,7 @@ export default function TaskDetailScreen({
 
         {/* IMAGE */}
 
-        {task.image ? (
+        {task?.image ? (
 
           <Image
             source={{
@@ -313,7 +399,7 @@ export default function TaskDetailScreen({
                 fontWeight: "700",
               }}
             >
-              {task.category ||
+              {task?.category ||
                 "Annet"}
             </Text>
 
@@ -332,7 +418,8 @@ export default function TaskDetailScreen({
               marginBottom: 16,
             }}
           >
-            {task.title}
+            {task?.title ||
+              "Ingen tittel"}
           </Text>
 
           {/* PRICE */}
@@ -348,9 +435,10 @@ export default function TaskDetailScreen({
               marginBottom: 24,
             }}
           >
-            {task.price
+            {task?.price
               ? `${task.price} kr`
-              : task.reward}
+              : task?.reward ||
+                "0 kr"}
           </Text>
 
           {/* DESCRIPTION */}
@@ -366,7 +454,7 @@ export default function TaskDetailScreen({
               marginBottom: 32,
             }}
           >
-            {task.description ||
+            {task?.description ||
               "Ingen beskrivelse"}
           </Text>
 
@@ -404,7 +492,7 @@ export default function TaskDetailScreen({
                 color: "#111827",
               }}
             >
-              {task.creatorName ||
+              {task?.creatorName ||
                 "Bruker"}
             </Text>
 
@@ -451,7 +539,7 @@ export default function TaskDetailScreen({
 
           {/* ACCEPT BUTTON */}
 
-          {!task.accepted && (
+          {!task?.accepted && (
 
             <TouchableOpacity
               disabled={

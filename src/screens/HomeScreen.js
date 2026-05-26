@@ -32,6 +32,7 @@ import AppCard from "../components/AppCard";
 export default function HomeScreen({
   navigation,
 }) {
+
   const [tasks, setTasks] =
     useState([]);
 
@@ -44,6 +45,7 @@ export default function HomeScreen({
   ] = useState(null);
 
   useEffect(() => {
+
     getUserLocation();
 
     const q = query(
@@ -52,34 +54,66 @@ export default function HomeScreen({
     );
 
     const unsubscribe =
-      onSnapshot(q, (snapshot) => {
-        const taskList = [];
+      onSnapshot(
+        q,
 
-        snapshot.forEach((doc) => {
-          taskList.push({
-            id: doc.id,
-            ...doc.data(),
-          });
-        });
+        (snapshot) => {
 
-        setTasks(taskList);
-        setLoading(false);
-      });
+          const taskList =
+            [];
+
+          snapshot.forEach(
+            (doc) => {
+
+              taskList.push({
+                id:
+                  doc.id,
+
+                ...doc.data(),
+              });
+            }
+          );
+
+          console.log(
+            "LOADED TASKS:",
+            taskList.length
+          );
+
+          setTasks(taskList);
+
+          setLoading(false);
+        },
+
+        (error) => {
+
+          console.log(
+            "TASK LOAD ERROR:",
+            error
+          );
+
+          setLoading(false);
+        }
+      );
 
     return unsubscribe;
+
   }, []);
 
   // USER LOCATION
 
   const getUserLocation =
     async () => {
+
       try {
+
         const { status } =
           await Location.requestForegroundPermissionsAsync();
 
         if (
-          status !== "granted"
+          status !==
+          "granted"
         ) {
+
           return;
         }
 
@@ -97,7 +131,9 @@ export default function HomeScreen({
             location.coords
               .longitude,
         });
+
       } catch (e) {
+
         console.log(
           "LOCATION ERROR:",
           e
@@ -110,24 +146,26 @@ export default function HomeScreen({
   const getTimeAgo = (
     timestamp
   ) => {
+
     if (!timestamp)
       return "Nettopp";
 
-    let time = timestamp;
-
-    // FIRESTORE TIMESTAMP
+    let time =
+      timestamp;
 
     if (
       typeof timestamp ===
         "object" &&
       timestamp?.seconds
     ) {
+
       time =
         timestamp.seconds *
         1000;
     }
 
-    const now = Date.now();
+    const now =
+      Date.now();
 
     const diff =
       now - time;
@@ -159,7 +197,7 @@ export default function HomeScreen({
     return `${days} d siden`;
   };
 
-  // REAL DISTANCE
+  // DISTANCE
 
   const getDistance = (
     lat1,
@@ -167,13 +205,16 @@ export default function HomeScreen({
     lat2,
     lon2
   ) => {
+
     if (
       !lat1 ||
       !lon1 ||
       !lat2 ||
       !lon2
-    )
+    ) {
+
       return 9999;
+    }
 
     const R = 6371;
 
@@ -190,19 +231,23 @@ export default function HomeScreen({
     const a =
       Math.sin(dLat / 2) *
         Math.sin(dLat / 2) +
+
       Math.cos(
         (lat1 *
           Math.PI) /
           180
       ) *
+
         Math.cos(
           (lat2 *
             Math.PI) /
             180
         ) *
+
         Math.sin(
           dLon / 2
         ) *
+
         Math.sin(
           dLon / 2
         );
@@ -218,55 +263,89 @@ export default function HomeScreen({
   };
 
   return (
+
     <ScrollView
-      style={styles.container}
+      style={
+        styles.container
+      }
+
       contentContainerStyle={{
         paddingBottom: 120,
       }}
+
       showsVerticalScrollIndicator={
         false
       }
     >
+
       {/* HEADER */}
 
-      <View style={styles.header}>
+      <View
+        style={
+          styles.header
+        }
+      >
+
         <View>
+
           <Image
             source={require("../../assets/logo.png")}
-            style={styles.logo}
+
+            style={
+              styles.logo
+            }
           />
 
-          <Text style={styles.location}>
+          <Text
+            style={
+              styles.location
+            }
+          >
             Oppdrag nær deg
           </Text>
+
         </View>
 
         <TouchableOpacity>
+
           <Ionicons
             name="notifications-outline"
+
             size={28}
-            color={colors.dark}
+
+            color={
+              colors.dark
+            }
           />
+
         </TouchableOpacity>
+
       </View>
 
       {/* HERO */}
 
       <View
-        style={styles.heroContainer}
+        style={
+          styles.heroContainer
+        }
       >
+
         <TouchableOpacity
           style={
             styles.needHelpCard
           }
+
           onPress={() =>
             navigation.navigate(
-            "CreateTask"
+              "CreateTask"
             )
           }
         >
+
           <Text
-            style={styles.heroTitle}
+            style={
+              styles.heroTitle
+            }
           >
             Trenger hjelp
           </Text>
@@ -278,21 +357,25 @@ export default function HomeScreen({
           >
             Opprett et oppdrag
           </Text>
+
         </TouchableOpacity>
 
         <TouchableOpacity
-            style={
+          style={
             styles.canHelpCard
-            }
+          }
 
-            onPress={() =>
+          onPress={() =>
             navigation.navigate(
-            "Tasks"
+              "Tasks"
             )
-            }
+          }
         >
+
           <Text
-            style={styles.heroTitle}
+            style={
+              styles.heroTitle
+            }
           >
             Kan hjelpe
           </Text>
@@ -304,44 +387,68 @@ export default function HomeScreen({
           >
             Se oppdrag nær deg
           </Text>
+
         </TouchableOpacity>
+
       </View>
 
       {/* SECTION */}
 
       <View
-        style={styles.sectionHeader}
+        style={
+          styles.sectionHeader
+        }
       >
+
         <Text
-          style={styles.sectionTitle}
+          style={
+            styles.sectionTitle
+          }
         >
           Aktive oppdrag
         </Text>
+
       </View>
 
       {/* LOADING */}
 
       {loading ? (
+
         <ActivityIndicator
           size="large"
-          color={colors.primary}
+
+          color={
+            colors.primary
+          }
+
           style={{
             marginTop: 40,
           }}
         />
-      ) : tasks.length === 0 ? (
+
+      ) : tasks.length ===
+        0 ? (
+
         <Text
-          style={styles.emptyText}
+          style={
+            styles.emptyText
+          }
         >
           Ingen oppdrag enda
         </Text>
+
       ) : (
+
         tasks
+
           .sort((a, b) => {
+
             if (
               !userLocation
-            )
+            ) {
+
               return 0;
+            }
 
             const distA =
               getDistance(
@@ -363,34 +470,45 @@ export default function HomeScreen({
               distA - distB
             );
           })
+
           .map((task) => (
+
             <TouchableOpacity
               key={task.id}
+
               onPress={() =>
+
                 navigation.navigate(
-                  "Tasks",
+                  "TaskDetail",
+
                   {
-                    task,
+                    taskId:
+                      task.id,
                   }
                 )
               }
             >
+
               <AppCard
                 style={
                   styles.taskCard
                 }
               >
+
                 <View
                   style={
                     styles.taskRow
                   }
                 >
+
                   <View
                     style={{
                       flex: 1,
+
                       marginRight: 10,
                     }}
                   >
+
                     <Text
                       style={
                         styles.taskTitle
@@ -403,6 +521,7 @@ export default function HomeScreen({
                       style={
                         styles.taskDescription
                       }
+
                       numberOfLines={
                         2
                       }
@@ -430,6 +549,7 @@ export default function HomeScreen({
                         task.createdAt
                       )}
                     </Text>
+
                   </View>
 
                   <Text
@@ -439,126 +559,192 @@ export default function HomeScreen({
                   >
                     {task.price
                       ? `${task.price} kr`
-                      : task.reward || "0 kr"}
-                  
+                      : task.reward ||
+                        "0 kr"}
                   </Text>
+
                 </View>
+
               </AppCard>
+
             </TouchableOpacity>
           ))
       )}
+
     </ScrollView>
   );
 }
 
 const styles =
   StyleSheet.create({
+
     container: {
+
       flex: 1,
+
       backgroundColor:
         colors.background,
+
       paddingHorizontal: 20,
+
       paddingTop: 60,
     },
 
     header: {
-      flexDirection: "row",
+
+      flexDirection:
+        "row",
+
       justifyContent:
         "space-between",
-      alignItems: "center",
+
+      alignItems:
+        "center",
+
       marginBottom: 30,
     },
 
     logo: {
+
       width: 150,
+
       height: 60,
     },
 
     location: {
+
       fontSize: 16,
-      color: colors.gray,
+
+      color:
+        colors.gray,
+
       marginTop: 4,
     },
 
     heroContainer: {
+
       gap: 16,
+
       marginBottom: 30,
     },
 
     needHelpCard: {
+
       backgroundColor:
         "#ff5f57",
+
       padding: 24,
+
       borderRadius: 24,
     },
 
     canHelpCard: {
+
       backgroundColor:
         "#22c55e",
+
       padding: 24,
+
       borderRadius: 24,
     },
 
     heroTitle: {
+
       color: "#fff",
+
       fontSize: 24,
+
       fontWeight: "700",
+
       marginBottom: 6,
     },
 
     heroSubtitle: {
+
       color: "#fff",
+
       fontSize: 16,
     },
 
     sectionHeader: {
+
       marginBottom: 20,
     },
 
     sectionTitle: {
+
       fontSize: 22,
+
       fontWeight: "700",
-      color: colors.dark,
+
+      color:
+        colors.dark,
     },
 
     taskCard: {
+
       marginBottom: 16,
     },
 
     taskRow: {
-      flexDirection: "row",
+
+      flexDirection:
+        "row",
+
       justifyContent:
         "space-between",
-      alignItems: "center",
+
+      alignItems:
+        "center",
     },
 
     taskTitle: {
+
       fontSize: 18,
+
       fontWeight: "700",
-      color: colors.dark,
+
+      color:
+        colors.dark,
+
       marginBottom: 6,
     },
 
     taskDescription: {
-      color: colors.gray,
+
+      color:
+        colors.gray,
+
       marginBottom: 8,
     },
 
     taskDistance: {
-      color: colors.gray,
+
+      color:
+        colors.gray,
+
       fontSize: 14,
     },
 
     price: {
+
       fontSize: 20,
+
       fontWeight: "800",
+
       color: "#22c55e",
     },
 
     emptyText: {
-      textAlign: "center",
+
+      textAlign:
+        "center",
+
       marginTop: 50,
-      color: colors.gray,
+
+      color:
+        colors.gray,
+
       fontSize: 16,
     },
   });
