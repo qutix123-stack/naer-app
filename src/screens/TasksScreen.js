@@ -31,6 +31,7 @@ import AppCard from "../components/AppCard";
 export default function TasksScreen({
   navigation,
 }) {
+
   const [tasks, setTasks] =
     useState([]);
 
@@ -57,6 +58,7 @@ export default function TasksScreen({
   ];
 
   useEffect(() => {
+
     getUserLocation();
 
     const q = query(
@@ -65,32 +67,62 @@ export default function TasksScreen({
     );
 
     const unsubscribe =
-      onSnapshot(q, (snapshot) => {
-        const taskList = [];
+      onSnapshot(
 
-        snapshot.forEach((doc) => {
-          taskList.push({
-            id: doc.id,
-            ...doc.data(),
-          });
-        });
+        q,
 
-        setTasks(taskList);
-        setLoading(false);
-      });
+        (snapshot) => {
+
+          const taskList =
+            [];
+
+          snapshot.forEach(
+            (doc) => {
+
+              taskList.push({
+                id:
+                  doc.id,
+
+                ...doc.data(),
+              });
+            }
+          );
+
+          setTasks(taskList);
+
+          setLoading(false);
+        },
+
+        (error) => {
+
+          console.log(
+            "TASKS ERROR:",
+            error
+          );
+
+          setLoading(false);
+        }
+      );
 
     return unsubscribe;
+
   }, []);
+
+  // LOCATION
 
   const getUserLocation =
     async () => {
+
       try {
+
         const { status } =
           await Location.requestForegroundPermissionsAsync();
 
         if (
-          status !== "granted"
+          status !==
+          "granted"
         ) {
+
           return;
         }
 
@@ -108,10 +140,17 @@ export default function TasksScreen({
             location.coords
               .longitude,
         });
+
       } catch (e) {
-        console.log(e);
+
+        console.log(
+          "LOCATION ERROR:",
+          e
+        );
       }
     };
+
+  // DISTANCE
 
   const getDistance = (
     lat1,
@@ -119,13 +158,16 @@ export default function TasksScreen({
     lat2,
     lon2
   ) => {
+
     if (
       !lat1 ||
       !lon1 ||
       !lat2 ||
       !lon2
-    )
+    ) {
+
       return 9999;
+    }
 
     const R = 6371;
 
@@ -142,19 +184,23 @@ export default function TasksScreen({
     const a =
       Math.sin(dLat / 2) *
         Math.sin(dLat / 2) +
+
       Math.cos(
         (lat1 *
           Math.PI) /
           180
       ) *
+
         Math.cos(
           (lat2 *
             Math.PI) /
             180
         ) *
+
         Math.sin(
           dLon / 2
         ) *
+
         Math.sin(
           dLon / 2
         );
@@ -169,25 +215,31 @@ export default function TasksScreen({
     return R * c;
   };
 
+  // TIME AGO
+
   const getTimeAgo = (
     timestamp
   ) => {
+
     if (!timestamp)
       return "Nettopp";
 
-    let time = timestamp;
+    let time =
+      timestamp;
 
     if (
       typeof timestamp ===
         "object" &&
       timestamp?.seconds
     ) {
+
       time =
         timestamp.seconds *
         1000;
     }
 
-    const now = Date.now();
+    const now =
+      Date.now();
 
     const diff =
       now - time;
@@ -216,10 +268,14 @@ export default function TasksScreen({
     )} d siden`;
   };
 
+  // FILTER
+
   const filteredTasks =
     selectedCategory ===
     "Alle"
+
       ? tasks
+
       : tasks.filter(
           (task) =>
             task.category ===
@@ -227,112 +283,169 @@ export default function TasksScreen({
         );
 
   return (
+
     <ScrollView
-      style={styles.container}
+      style={
+        styles.container
+      }
+
       contentContainerStyle={{
         paddingBottom: 120,
       }}
+
       showsVerticalScrollIndicator={
         false
       }
     >
+
       {/* HEADER */}
 
-      <View style={styles.header}>
+      <View
+        style={
+          styles.header
+        }
+      >
+
         <TouchableOpacity
           onPress={() =>
             navigation.goBack()
           }
         >
+
           <Ionicons
             name="arrow-back"
+
             size={28}
-            color={colors.dark}
+
+            color={
+              colors.text
+            }
           />
+
         </TouchableOpacity>
 
-        <Text style={styles.title}>
+        <Text
+          style={
+            styles.title
+          }
+        >
           Oppdrag nær deg
         </Text>
 
         <TouchableOpacity>
+
           <Ionicons
             name="options-outline"
+
             size={28}
-            color={colors.dark}
+
+            color={
+              colors.text
+            }
           />
+
         </TouchableOpacity>
+
       </View>
 
       {/* CATEGORIES */}
 
       <ScrollView
         horizontal
+
         showsHorizontalScrollIndicator={
           false
         }
+
         style={{
           marginBottom: 25,
         }}
       >
+
         {categories.map(
           (category) => (
+
             <TouchableOpacity
               key={category}
+
               style={[
                 styles.categoryButton,
 
                 selectedCategory ===
                   category && {
+
                   backgroundColor:
                     colors.primary,
                 },
               ]}
+
               onPress={() =>
                 setSelectedCategory(
                   category
                 )
               }
             >
+
               <Text
                 style={[
                   styles.categoryText,
 
                   selectedCategory ===
                     category && {
-                    color: "#fff",
+
+                    color:
+                      "#FFFFFF",
                   },
                 ]}
               >
                 {category}
               </Text>
+
             </TouchableOpacity>
           )
         )}
+
       </ScrollView>
 
       {/* TASKS */}
 
       {loading ? (
+
         <ActivityIndicator
           size="large"
-          color={colors.primary}
+
+          color={
+            colors.primary
+          }
+
           style={{
             marginTop: 50,
           }}
         />
+
       ) : filteredTasks.length ===
         0 ? (
-        <Text style={styles.empty}>
+
+        <Text
+          style={
+            styles.empty
+          }
+        >
           Ingen oppdrag funnet
         </Text>
+
       ) : (
+
         filteredTasks
+
           .sort((a, b) => {
+
             if (
               !userLocation
-            )
+            ) {
+
               return 0;
+            }
 
             const distA =
               getDistance(
@@ -354,33 +467,43 @@ export default function TasksScreen({
               distA - distB
             );
           })
+
           .map((task) => (
+
             <TouchableOpacity
               key={task.id}
+
               onPress={() =>
+
                 navigation.navigate(
                   "TaskDetail",
+
                   {
-                    task,
+                    taskId:
+                      task.id,
                   }
                 )
               }
             >
+
               <AppCard
                 style={
                   styles.taskCard
                 }
               >
+
                 <View
                   style={
                     styles.taskRow
                   }
                 >
+
                   <View
                     style={{
                       flex: 1,
                     }}
                   >
+
                     <Text
                       style={
                         styles.taskTitle
@@ -393,6 +516,7 @@ export default function TasksScreen({
                       style={
                         styles.taskDescription
                       }
+
                       numberOfLines={
                         2
                       }
@@ -420,6 +544,7 @@ export default function TasksScreen({
                         task.createdAt
                       )}
                     </Text>
+
                   </View>
 
                   <Text
@@ -427,94 +552,147 @@ export default function TasksScreen({
                       styles.price
                     }
                   >
-                    {task.price ||
-                      0}{" "}
-                    kr
+                    {task.price
+                      ? `${task.price} kr`
+                      : "0 kr"}
                   </Text>
+
                 </View>
+
               </AppCard>
+
             </TouchableOpacity>
           ))
       )}
+
     </ScrollView>
   );
 }
 
 const styles =
   StyleSheet.create({
+
     container: {
+
       flex: 1,
+
       backgroundColor:
         colors.background,
+
       paddingTop: 60,
+
       paddingHorizontal: 20,
     },
 
     header: {
-      flexDirection: "row",
+
+      flexDirection:
+        "row",
+
       justifyContent:
         "space-between",
-      alignItems: "center",
+
+      alignItems:
+        "center",
+
       marginBottom: 30,
     },
 
     title: {
+
       fontSize: 24,
+
       fontWeight: "700",
-      color: colors.dark,
+
+      color:
+        colors.text,
     },
 
     categoryButton: {
+
       backgroundColor:
-        "#fff",
+        "#FFFFFF",
+
       paddingHorizontal: 18,
+
       paddingVertical: 10,
+
       borderRadius: 20,
+
       marginRight: 10,
     },
 
     categoryText: {
-      color: colors.dark,
+
+      color:
+        colors.text,
+
       fontWeight: "600",
     },
 
     taskCard: {
+
       marginBottom: 16,
     },
 
     taskRow: {
-      flexDirection: "row",
+
+      flexDirection:
+        "row",
+
       justifyContent:
         "space-between",
-      alignItems: "center",
+
+      alignItems:
+        "center",
     },
 
     taskTitle: {
+
       fontSize: 18,
+
       fontWeight: "700",
-      color: colors.dark,
+
+      color:
+        colors.text,
+
       marginBottom: 6,
     },
 
     taskDescription: {
-      color: colors.gray,
+
+      color:
+        colors.muted,
+
       marginBottom: 8,
     },
 
     meta: {
-      color: colors.gray,
+
+      color:
+        colors.muted,
+
       fontSize: 14,
     },
 
     price: {
+
       fontSize: 20,
+
       fontWeight: "800",
-      color: "#22c55e",
+
+      color:
+        "#22C55E",
     },
 
     empty: {
-      textAlign: "center",
+
+      textAlign:
+        "center",
+
       marginTop: 50,
-      color: colors.gray,
+
+      color:
+        colors.muted,
     },
   });
