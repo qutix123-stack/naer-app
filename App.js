@@ -1,6 +1,15 @@
 import {
+  useEffect,
   useState,
 } from "react";
+
+import {
+  onAuthStateChanged,
+} from "firebase/auth";
+
+import {
+  auth,
+} from "./src/firebaseConfig";
 
 import {
   View,
@@ -230,11 +239,23 @@ function Tabs() {
 
 export default function App() {
 
-  // TEMP TEST
-  // FORCE APP INSIDE
+  const [user, setUser] =
+    useState(null);
 
-  const [user] =
-    useState(true);
+  useEffect(() => {
+
+    const unsubscribe =
+      onAuthStateChanged(
+        auth,
+        (user) => {
+
+          setUser(user);
+        }
+      );
+
+    return unsubscribe;
+
+  }, []);
 
   return (
 

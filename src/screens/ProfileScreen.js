@@ -42,6 +42,8 @@ import {
   updatePassword,
   deleteUser,
   updateProfile,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
 } from "firebase/auth";
 
 import {
@@ -90,11 +92,24 @@ export default function ProfileScreen() {
     setShowPasswordModal,
   ] = useState(false);
 
+  const [
+  showSettingsModal,
+  setShowSettingsModal,
+] = useState(false);
+
+const [
+  currentPassword,
+  setCurrentPassword,
+] = useState("");
+
   // LOAD USER
   useEffect(() => {
 
     const fetchUser =
       async () => {
+
+        if (!auth.currentUser)
+  return;
 
         try {
 
@@ -372,57 +387,89 @@ export default function ProfileScreen() {
 
   // CHANGE PASSWORD
   const changePassword =
-    async () => {
+  async () => {
 
-      try {
+    try {
 
-        if (
-          newPassword.length <
-          6
-        ) {
+      if (
+        currentPassword.length <
+        6
+      ) {
 
-          return Alert.alert(
-            "Passord må være minst 6 tegn"
-          );
-        }
-
-        await updatePassword(
-          auth.currentUser,
-          newPassword
-        );
-
-        setNewPassword("");
-
-        setShowPasswordModal(
-          false
-        );
-
-        Alert.alert(
-          "Passord oppdatert 🔥"
-        );
-
-      } catch (e) {
-
-        console.log(e);
-
-        Alert.alert(
-          "Logg inn igjen for å endre passord"
+        return Alert.alert(
+          "Skriv inn nåværende passord"
         );
       }
-    };
+
+      if (
+        newPassword.length <
+        6
+      ) {
+
+        return Alert.alert(
+          "Nytt passord må være minst 6 tegn"
+        );
+      }
+
+      if (!auth.currentUser) {
+
+  return Alert.alert(
+    "Logg inn igjen 😄"
+  );
+}
+
+      const credential =
+        EmailAuthProvider.credential(
+
+          auth.currentUser.email,
+
+          currentPassword
+        );
+
+      await reauthenticateWithCredential(
+        auth.currentUser,
+        credential
+      );
+
+      await updatePassword(
+        auth.currentUser,
+        newPassword
+      );
+
+      await signOut(auth);
+
+Alert.alert(
+  "Passord oppdatert 😄",
+  "Logg inn igjen."
+);
+
+      setCurrentPassword("");
+      setNewPassword("");
+
+      Alert.alert(
+        "Passord oppdatert 🔥"
+      );
+
+      await signOut(auth);
+
+    } catch (e) {
+
+      console.log(e);
+
+      Alert.alert(
+        "Feil passord"
+      );
+    }
+  };
 
   // LOGOUT
-  const logout =
+
+const logout =
   async () => {
 
     try {
 
       setLoading(true);
-
-      console.log(
-        "AUTH:",
-          auth
-        );
 
       await signOut(auth);
 
@@ -734,40 +781,65 @@ export default function ProfileScreen() {
 
       </View>
 
-      {/* MENU */}
-      <View
-        style={
-          styles.menuContainer
-        }
-      >
+{/* MENU */}
 
-        <MenuItem
-          icon="shield-checkmark-outline"
-          title="Verifisert"
-        />
+<View
+  style={
+    styles.menuContainer
+  }
+>
 
-        <MenuItem
-          icon="card-outline"
-          title="Betalinger"
-        />
+  <MenuItem
+    icon="shield-checkmark-outline"
+    title="Verifisert"
 
-        <MenuItem
-          icon="settings-outline"
-          title="Innstillinger"
-          onPress={() =>
-            setShowNameModal(
-              true
-            )
-          }
-        />
+    onPress={() =>
 
-        <MenuItem
-          icon="help-circle-outline"
-          title="Hjelp & support"
-        />
+      Alert.alert(
+        "Verifisering",
+        "Kommer snart 😄"
+      )
+    }
+  />
 
-      </View>
+  <MenuItem
+    icon="card-outline"
+    title="Betalinger"
 
+    onPress={() =>
+
+      Alert.alert(
+        "Betalinger",
+        "Stripe kommer snart 💳"
+      )
+    }
+  />
+
+  <MenuItem
+    icon="settings-outline"
+    title="Innstillinger"
+
+    onPress={() =>
+      setShowSettingsModal(
+        true
+      )
+    }
+  />
+
+  <MenuItem
+    icon="help-circle-outline"
+    title="Hjelp & support"
+
+    onPress={() =>
+
+      Alert.alert(
+        "Support",
+        "Kontakt oss på support@naer.no 😄"
+      )
+    }
+  />
+
+</View>
       {/* BUTTONS */}
       <TouchableOpacity
         style={
@@ -803,6 +875,221 @@ export default function ProfileScreen() {
         </Text>
       </TouchableOpacity>
 
+      {/* SETTINGS MODAL */}
+
+<Modal
+  visible={
+    showSettingsModal
+  }
+
+  transparent
+
+  animationType="fade"
+>
+
+  <View
+    style={
+      styles.modalOverlay
+    }
+  >
+
+    <View
+      style={
+        styles.modalContent
+      }
+    >
+
+      <TouchableOpacity
+  onPress={() =>
+    setShowSettingsModal(
+      false
+    )
+  }
+
+  style={{
+    position:
+      "absolute",
+
+    top: 18,
+
+    right: 18,
+
+    zIndex: 10,
+  }}
+>
+
+  <Ionicons
+    name="close"
+    size={28}
+    color="#111827"
+  />
+
+</TouchableOpacity>
+
+      <Text
+        style={
+          styles.modalTitle
+        }
+      >
+        Innstillinger
+      </Text>
+
+      <TouchableOpacity
+  style={
+    styles.settingButton
+  }
+
+  activeOpacity={0.8}
+
+  onPress={() => {
+
+    setShowSettingsModal(
+      false
+    );
+
+    setShowNameModal(
+      true
+    );
+  }}
+>
+
+  <View
+    style={{
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+    }}
+  >
+
+    <Text
+      style={{
+        fontSize: 20,
+
+        marginRight: 10,
+      }}
+    >
+      👤
+    </Text>
+
+    <Text
+      style={
+        styles.settingText
+      }
+    >
+      Endre navn
+    </Text>
+
+  </View>
+
+</TouchableOpacity>
+
+      <TouchableOpacity
+  style={
+    styles.settingButton
+  }
+
+  activeOpacity={0.8}
+
+  onPress={() => {
+
+    setShowSettingsModal(
+      false
+    );
+
+    setShowPasswordModal(
+      true
+    );
+  }}
+>
+
+  <View
+    style={{
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+    }}
+  >
+
+    <Text
+      style={{
+        fontSize: 20,
+
+        marginRight: 10,
+      }}
+    >
+      🔒
+    </Text>
+
+    <Text
+      style={
+        styles.settingText
+      }
+    >
+      Endre passord
+    </Text>
+
+  </View>
+
+</TouchableOpacity>
+
+      <TouchableOpacity
+  style={
+    styles.settingButton
+  }
+
+  activeOpacity={0.8}
+
+  onPress={() =>
+
+    Alert.alert(
+      "Språk",
+      "English kommer snart 🇬🇧"
+    )
+  }
+>
+
+  <View
+  style={{
+    flexDirection:
+      "row",
+
+    alignItems:
+      "center",
+  }}
+>
+
+    <Text
+      style={{
+        fontSize: 20,
+
+        marginRight: 10,
+      }}
+    >
+      🌍
+    </Text>
+
+    <Text
+      style={
+        styles.settingText
+      }
+    >
+      Language: Norsk
+    </Text>
+
+  </View>
+
+</TouchableOpacity>
+
+    </View>
+
+  </View>
+
+</Modal>
+
       {/* NAME MODAL */}
       <Modal
         visible={
@@ -823,6 +1110,33 @@ export default function ProfileScreen() {
               styles.modalContent
             }
           >
+
+          <TouchableOpacity
+  onPress={() =>
+    setShowNameModal(
+      false
+    )
+  }
+
+  style={{
+    position:
+      "absolute",
+
+    top: 18,
+
+    right: 18,
+
+    zIndex: 10,
+  }}
+>
+
+  <Ionicons
+    name="close"
+    size={28}
+    color="#111827"
+  />
+
+</TouchableOpacity>
 
             <Text
               style={
@@ -867,6 +1181,7 @@ export default function ProfileScreen() {
       </Modal>
 
       {/* PASSWORD MODAL */}
+
       <Modal
         visible={
           showPasswordModal
@@ -887,6 +1202,33 @@ export default function ProfileScreen() {
             }
           >
 
+            <TouchableOpacity
+  onPress={() =>
+    setShowPasswordModal(
+      false
+    )
+  }
+
+  style={{
+    position:
+      "absolute",
+
+    top: 18,
+
+    right: 18,
+
+    zIndex: 10,
+  }}
+>
+
+  <Ionicons
+    name="close"
+    size={28}
+    color="#111827"
+  />
+
+</TouchableOpacity>
+
             <Text
               style={
                 styles.modalTitle
@@ -894,6 +1236,25 @@ export default function ProfileScreen() {
             >
               Bytt passord
             </Text>
+
+              <TextInput
+  secureTextEntry
+
+  value={
+    currentPassword
+  }
+
+  onChangeText={
+    setCurrentPassword
+  }
+
+  placeholder=
+    "Nåværende passord"
+
+  style={
+    styles.input
+  }
+/>
 
             <TextInput
               secureTextEntry
@@ -948,6 +1309,7 @@ function MenuItem({
       style={
         styles.menuItem
       }
+      activeOpacity={0.8}
       onPress={
         onPress
       }
@@ -1285,4 +1647,32 @@ const styles =
 
       fontSize: 16,
     },
-  });
+
+    settingButton: {
+
+  backgroundColor:
+    "#F1F5F9",
+
+  paddingVertical: 18,
+
+  borderRadius: 18,
+
+  alignItems:
+    "center",
+
+  marginBottom: 14,
+},
+
+settingText: {
+
+  fontSize: 16,
+
+  fontWeight:
+    "600",
+
+  color:
+    "#111827",
+},
+
+});
+
