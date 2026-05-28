@@ -5,6 +5,8 @@ import React, {
   useState,
 } from "react";
 
+import TaskCard from "../components/TaskCard";
+
 import {
   View,
   Text,
@@ -12,6 +14,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 
 import {
@@ -26,10 +29,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { db } from "../firebaseConfig";
 
 import colors from "../theme/colors";
-import AppCard from "../components/AppCard";
 
 export default function TasksScreen({
   navigation,
+  route,
 }) {
 
   const [tasks, setTasks] =
@@ -43,18 +46,29 @@ export default function TasksScreen({
     setUserLocation,
   ] = useState(null);
 
+  // CATEGORY FROM HOME
+
+  const routeCategory =
+    route?.params?.category;
+
   const [
     selectedCategory,
     setSelectedCategory,
-  ] = useState("Alle");
+  ] = useState(
+    routeCategory || "Alle"
+  );
 
   const categories = [
     "Alle",
     "Flytting",
-    "IT",
+    "Transport",
+    "Småjobber",
     "Rengjøring",
-    "Hund",
+    "IT",
+    "Barnepass",
     "Hage",
+    "Bygg",
+    "Annet",
   ];
 
   useEffect(() => {
@@ -284,288 +298,301 @@ export default function TasksScreen({
 
   return (
 
-    <ScrollView
-      style={
-        styles.container
-      }
-
-      contentContainerStyle={{
-        paddingBottom: 120,
+    <View
+      style={{
+        flex: 1,
       }}
-
-      showsVerticalScrollIndicator={
-        false
-      }
     >
 
-      {/* HEADER */}
-
-      <View
-        style={
-          styles.header
-        }
-      >
-
-        <TouchableOpacity
-          onPress={() =>
-            navigation.goBack()
-          }
-        >
-
-          <Ionicons
-            name="arrow-back"
-
-            size={28}
-
-            color={
-              colors.text
-            }
-          />
-
-        </TouchableOpacity>
-
-        <Text
-          style={
-            styles.title
-          }
-        >
-          Oppdrag nær deg
-        </Text>
-
-        <TouchableOpacity>
-
-          <Ionicons
-            name="options-outline"
-
-            size={28}
-
-            color={
-              colors.text
-            }
-          />
-
-        </TouchableOpacity>
-
-      </View>
-
-      {/* CATEGORIES */}
-
       <ScrollView
-        horizontal
+        style={
+          styles.container
+        }
 
-        showsHorizontalScrollIndicator={
+        contentContainerStyle={{
+          paddingBottom: 140,
+        }}
+
+        showsVerticalScrollIndicator={
           false
         }
-
-        style={{
-          marginBottom: 25,
-        }}
       >
 
-        {categories.map(
-          (category) => (
+        {/* HEADER */}
 
-            <TouchableOpacity
-              key={category}
+        <View
+          style={
+            styles.header
+          }
+        >
 
-              style={[
-                styles.categoryButton,
+          <TouchableOpacity
+            onPress={() =>
+              navigation.goBack()
+            }
 
-                selectedCategory ===
-                  category && {
+            activeOpacity={0.8}
+          >
 
-                  backgroundColor:
-                    colors.primary,
-                },
-              ]}
+            <Ionicons
+              name="arrow-back"
 
-              onPress={() =>
-                setSelectedCategory(
-                  category
-                )
+              size={28}
+
+              color={
+                colors.text
               }
-            >
+            />
 
-              <Text
+          </TouchableOpacity>
+
+          <Text
+            style={
+              styles.title
+            }
+          >
+            Oppdrag nær deg
+          </Text>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+          >
+
+            <Ionicons
+              name="options-outline"
+
+              size={28}
+
+              color={
+                colors.text
+              }
+            />
+
+          </TouchableOpacity>
+
+        </View>
+
+        {/* CATEGORIES */}
+
+        <ScrollView
+          horizontal
+
+          showsHorizontalScrollIndicator={
+            false
+          }
+
+          style={{
+            marginBottom: 25,
+          }}
+        >
+
+          {categories.map(
+            (category) => (
+
+              <TouchableOpacity
+                key={category}
+
+                activeOpacity={0.8}
+
                 style={[
-                  styles.categoryText,
+                  styles.categoryButton,
 
                   selectedCategory ===
                     category && {
 
-                    color:
-                      "#FFFFFF",
+                    backgroundColor:
+                      colors.primary,
                   },
                 ]}
-              >
-                {category}
-              </Text>
 
-            </TouchableOpacity>
-          )
+                onPress={() =>
+                  setSelectedCategory(
+                    category
+                  )
+                }
+              >
+
+                <Text
+                  style={[
+                    styles.categoryText,
+
+                    selectedCategory ===
+                      category && {
+
+                      color:
+                        "#FFFFFF",
+                    },
+                  ]}
+                >
+
+                  {category === "Alle" &&
+                    "⚡ "}
+
+                  {category ===
+                    "Flytting" &&
+                    "🚚 "}
+
+                  {category ===
+                    "Transport" &&
+                    "🚗 "}
+
+                  {category ===
+                    "Småjobber" &&
+                    "⚡ "}
+
+                  {category ===
+                    "IT" &&
+                    "💻 "}
+
+                  {category ===
+                    "Rengjøring" &&
+                    "✨ "}
+
+                  {category ===
+                    "Barnepass" &&
+                    "👶 "}
+
+                  {category ===
+                    "Hage" &&
+                    "🌿 "}
+
+                  {category ===
+                    "Bygg" &&
+                    "🛠️ "}
+
+                  {category ===
+                    "Annet" &&
+                    "📦 "}
+
+                  {category}
+
+                </Text>
+
+              </TouchableOpacity>
+            )
+          )}
+
+        </ScrollView>
+
+        {/* TASKS */}
+
+        {loading ? (
+
+          <ActivityIndicator
+            size="large"
+
+            color={
+              colors.primary
+            }
+
+            style={{
+              marginTop: 50,
+            }}
+          />
+
+        ) : filteredTasks.length ===
+          0 ? (
+
+          <Text
+            style={
+              styles.empty
+            }
+          >
+            Ingen oppdrag funnet
+          </Text>
+
+        ) : (
+
+          filteredTasks
+
+            .sort((a, b) => {
+
+              if (
+                !userLocation
+              ) {
+
+                return 0;
+              }
+
+              const distA =
+                getDistance(
+                  userLocation.latitude,
+                  userLocation.longitude,
+                  a.latitude,
+                  a.longitude
+                );
+
+              const distB =
+                getDistance(
+                  userLocation.latitude,
+                  userLocation.longitude,
+                  b.latitude,
+                  b.longitude
+                );
+
+              return (
+                distA - distB
+              );
+            })
+
+            .map((task) => (
+
+              <TaskCard
+                key={task.id}
+
+                task={task}
+
+                distance={Math.round(
+                  getDistance(
+                    userLocation?.latitude,
+                    userLocation?.longitude,
+                    task.latitude,
+                    task.longitude
+                  )
+                )}
+
+                timeAgo={getTimeAgo(
+                  task.createdAt
+                )}
+
+                onPress={() =>
+
+                  navigation.navigate(
+                    "TaskDetail",
+
+                    {
+                      taskId:
+                        task.id,
+                    }
+                  )
+                }
+              />
+            ))
         )}
 
       </ScrollView>
 
-      {/* TASKS */}
+      {/* FLOATING BUTTON */}
 
-      {loading ? (
+      <TouchableOpacity
+        activeOpacity={0.9}
 
-        <ActivityIndicator
-          size="large"
+        style={
+          styles.floatingButton
+        }
+      >
 
-          color={
-            colors.primary
-          }
+        <Ionicons
+          name="options"
 
-          style={{
-            marginTop: 50,
-          }}
+          size={28}
+
+          color="#FFFFFF"
         />
 
-      ) : filteredTasks.length ===
-        0 ? (
+      </TouchableOpacity>
 
-        <Text
-          style={
-            styles.empty
-          }
-        >
-          Ingen oppdrag funnet
-        </Text>
-
-      ) : (
-
-        filteredTasks
-
-          .sort((a, b) => {
-
-            if (
-              !userLocation
-            ) {
-
-              return 0;
-            }
-
-            const distA =
-              getDistance(
-                userLocation.latitude,
-                userLocation.longitude,
-                a.latitude,
-                a.longitude
-              );
-
-            const distB =
-              getDistance(
-                userLocation.latitude,
-                userLocation.longitude,
-                b.latitude,
-                b.longitude
-              );
-
-            return (
-              distA - distB
-            );
-          })
-
-          .map((task) => (
-
-            <TouchableOpacity
-              key={task.id}
-
-              onPress={() =>
-
-                navigation.navigate(
-                  "TaskDetail",
-
-                  {
-                    taskId:
-                      task.id,
-                  }
-                )
-              }
-            >
-
-              <AppCard
-                style={
-                  styles.taskCard
-                }
-              >
-
-                <View
-                  style={
-                    styles.taskRow
-                  }
-                >
-
-                  <View
-                    style={{
-                      flex: 1,
-                    }}
-                  >
-
-                    <Text
-                      style={
-                        styles.taskTitle
-                      }
-                    >
-                      {task.title}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.taskDescription
-                      }
-
-                      numberOfLines={
-                        2
-                      }
-                    >
-                      {
-                        task.description
-                      }
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.meta
-                      }
-                    >
-                      {Math.round(
-                        getDistance(
-                          userLocation?.latitude,
-                          userLocation?.longitude,
-                          task.latitude,
-                          task.longitude
-                        )
-                      )}{" "}
-                      km unna •{" "}
-                      {getTimeAgo(
-                        task.createdAt
-                      )}
-                    </Text>
-
-                  </View>
-
-                  <Text
-                    style={
-                      styles.price
-                    }
-                  >
-                    {task.price
-                      ? `${task.price} kr`
-                      : "0 kr"}
-                  </Text>
-
-                </View>
-
-              </AppCard>
-
-            </TouchableOpacity>
-          ))
-      )}
-
-    </ScrollView>
+    </View>
   );
 }
 
@@ -579,7 +606,13 @@ const styles =
       backgroundColor:
         colors.background,
 
-      paddingTop: 60,
+      paddingTop:
+        Platform.OS ===
+        "android"
+
+          ? 58
+
+          : 64,
 
       paddingHorizontal: 20,
     },
@@ -602,7 +635,7 @@ const styles =
 
       fontSize: 24,
 
-      fontWeight: "700",
+      fontWeight: "800",
 
       color:
         colors.text,
@@ -615,11 +648,20 @@ const styles =
 
       paddingHorizontal: 18,
 
-      paddingVertical: 10,
+      paddingVertical: 12,
 
-      borderRadius: 20,
+      borderRadius: 999,
 
-      marginRight: 10,
+      marginRight: 12,
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.04,
+
+      shadowRadius: 8,
+
+      elevation: 2,
     },
 
     categoryText: {
@@ -627,62 +669,43 @@ const styles =
       color:
         colors.text,
 
-      fontWeight: "600",
+      fontWeight: "700",
+
+      fontSize: 15,
     },
 
-    taskCard: {
+    floatingButton: {
 
-      marginBottom: 16,
-    },
+      position:
+        "absolute",
 
-    taskRow: {
+      right: 24,
 
-      flexDirection:
-        "row",
+      bottom: 34,
+
+      width: 68,
+
+      height: 68,
+
+      borderRadius: 999,
+
+      backgroundColor:
+        "#2563EB",
 
       justifyContent:
-        "space-between",
+        "center",
 
       alignItems:
         "center",
-    },
 
-    taskTitle: {
+      shadowColor:
+        "#2563EB",
 
-      fontSize: 18,
+      shadowOpacity: 0.35,
 
-      fontWeight: "700",
+      shadowRadius: 12,
 
-      color:
-        colors.text,
-
-      marginBottom: 6,
-    },
-
-    taskDescription: {
-
-      color:
-        colors.muted,
-
-      marginBottom: 8,
-    },
-
-    meta: {
-
-      color:
-        colors.muted,
-
-      fontSize: 14,
-    },
-
-    price: {
-
-      fontSize: 20,
-
-      fontWeight: "800",
-
-      color:
-        "#22C55E",
+      elevation: 10,
     },
 
     empty: {
@@ -694,5 +717,7 @@ const styles =
 
       color:
         colors.muted,
+
+      fontSize: 15,
     },
   });

@@ -4,14 +4,7 @@ import React, {
   useRef,
 } from "react";
 
-import {
-  doc,
-  getDoc,
-} from "firebase/firestore";
-
-import {
-  sendPushNotification,
-} from "../utils/sendPushNotification";
+import * as ImagePicker from "expo-image-picker";
 
 import {
   View,
@@ -23,8 +16,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   SafeAreaView,
+  ActivityIndicator,
   Image,
 } from "react-native";
+
+import {
+  Ionicons,
+} from "@expo/vector-icons";
 
 import {
   collection,
@@ -33,11 +31,21 @@ import {
   query,
   orderBy,
   serverTimestamp,
+  doc,
+  getDoc,
+  setDoc,
 } from "firebase/firestore";
+
+import {
+  ref,
+  uploadBytes,
+  getDownloadURL,
+} from "firebase/storage";
 
 import {
   auth,
   db,
+  storage,
 } from "../firebaseConfig";
 
 export default function ChatScreen({
@@ -54,17 +62,44 @@ export default function ChatScreen({
   const [text, setText] =
     useState("");
 
+  const [loading, setLoading] =
+    useState(true);
+
+  const [task, setTask] =
+    useState(null);
+
+  const [image, setImage] =
+    useState(null);
+
+  const [sending, setSending] =
+    useState(false);
+
   const [otherUser, setOtherUser] =
     useState("Bruker");
+
+  const [isTyping, setIsTyping] =
+    useState(false);
+
+  const [typingTimeout, setTypingTimeout] =
+    useState(null);
 
   const flatListRef =
     useRef(null);
 
+  const typingRef =
+    doc(
+      db,
+      "tasks",
+      taskId,
+      "typing",
+      "status"
+    );
+
+  // LOAD
+
   useEffect(() => {
 
-    loadOtherUser();
-
-    if (!taskId) return;
+    loadTask();
 
     const q = query(
       collection(
@@ -83,23 +118,30 @@ export default function ChatScreen({
     const unsubscribe =
       onSnapshot(
         q,
+
         (snapshot) => {
 
-          const loaded = [];
+          const loaded =
+            [];
 
           snapshot.forEach(
             (doc) => {
 
               loaded.push({
-                id: doc.id,
+                id:
+                  doc.id,
+
                 ...doc.data(),
               });
-
             }
           );
 
           setMessages(
             loaded
+          );
+
+          setLoading(
+            false
           );
 
           setTimeout(() => {
@@ -116,14 +158,53 @@ export default function ChatScreen({
 
     return unsubscribe;
 
-  }, [taskId]);
+  }, []);
 
-  const loadOtherUser =
+  // TYPING LISTENER
+
+  useEffect(() => {
+
+    const unsubscribe =
+      onSnapshot(
+
+        typingRef,
+
+        (snap) => {
+
+          const data =
+            snap.data();
+
+          if (
+            !data
+          )
+            return;
+
+          if (
+
+            data.userId !==
+            auth.currentUser?.uid
+
+          ) {
+
+            setIsTyping(
+              data.typing
+            );
+          }
+        }
+      );
+
+    return unsubscribe;
+
+  }, []);
+
+  // LOAD TASK
+
+  const loadTask =
     async () => {
 
       try {
 
-        const taskSnap =
+        const snap =
           await getDoc(
             doc(
               db,
@@ -132,57 +213,135 @@ export default function ChatScreen({
             )
           );
 
-        const task =
-          taskSnap.data();
+        const data =
+          snap.data();
 
-        if (!task)
+        if (!data)
           return;
 
+        setTask(data);
+
         if (
-          task.createdBy ===
-          auth.currentUser.uid
+          data.ownerId ===
+          auth.currentUser?.uid
         ) {
 
           setOtherUser(
-            task.acceptedBy ||
+            data.acceptedByName ||
             "Hjelper"
           );
 
         } else {
 
           setOtherUser(
-            task.creatorName ||
+            data.creatorName ||
             "Bruker"
           );
-
         }
 
       } catch (e) {
 
         console.log(e);
-
       }
     };
+
+  // PICK IMAGE
+
+  const pickImage =
+    async () => {
+
+      const result =
+        await ImagePicker.launchImageLibraryAsync({
+
+          mediaTypes:
+            ImagePicker.MediaType.Images,
+
+          allowsEditing:
+            true,
+
+          quality: 0.7,
+        });
+
+      if (
+        !result.canceled
+      ) {
+
+        setImage(
+          result.assets[0].uri
+        );
+      }
+    };
+
+  // SEND MESSAGE
 
   const sendMessage =
     async () => {
 
-       const cleaned =
-        text
-          .replace(
-            /\s+/g,
-            " "
-          )
-          .trim();
+      const cleaned =
+        text.trim();
 
       if (
-        !cleaned ||
-
-        cleaned.length > 300
-        )
+        !cleaned &&
+        !image
+      )
         return;
 
       try {
+
+        setSending(true);
+
+        let imageUrl =
+          null;
+
+        // STOP TYPING
+
+        await setDoc(
+
+          typingRef,
+
+          {
+            typing:
+              false,
+
+            userId:
+              auth.currentUser
+                ?.uid,
+          }
+        );
+
+        // UPLOAD IMAGE
+
+        if (image) {
+
+          const response =
+            await fetch(
+              image
+            );
+
+          const blob =
+            await response.blob();
+
+          const filename =
+            `chatImages/${Date.now()}`;
+
+          const storageRef =
+            ref(
+              storage,
+              filename
+            );
+
+          await uploadBytes(
+            storageRef,
+            blob
+          );
+
+          imageUrl =
+            await getDownloadURL(
+              storageRef
+            );
+        }
+
+        // SAVE MESSAGE
 
         await addDoc(
           collection(
@@ -194,18 +353,18 @@ export default function ChatScreen({
 
           {
             text:
-              cleaned,
+              cleaned || "",
+
+            image:
+              imageUrl,
 
             senderId:
               auth.currentUser
-                ?.uid || "",
+                ?.uid,
 
             senderName:
               auth.currentUser
                 ?.displayName ||
-
-              auth.currentUser
-                ?.email ||
 
               "Bruker",
 
@@ -214,95 +373,24 @@ export default function ChatScreen({
           }
         );
 
-        try {
-
-          const taskRef =
-            await getDoc(
-              doc(
-                db,
-                "tasks",
-                taskId
-              )
-            );
-
-          const taskData =
-            taskRef.data();
-
-          let otherUserId =
-            null;
-
-          if (
-            taskData.createdBy ===
-            auth.currentUser.uid
-          ) {
-
-            otherUserId =
-              taskData.acceptedById;
-
-          } else {
-
-            otherUserId =
-              taskData.createdBy;
-
-          }
-
-          if (
-            otherUserId
-          ) {
-
-            const userRef =
-              await getDoc(
-                doc(
-                  db,
-                  "users",
-                  otherUserId
-                )
-              );
-
-            const userData =
-              userRef.data();
-
-            if (
-              userData?.pushToken
-            ) {
-
-              await sendPushNotification(
-                userData.pushToken,
-
-                `💬 ${auth.currentUser.displayName}`,
-
-                text
-              );
-            }
-          }
-
-        } catch (e) {
-
-          console.log(
-            "NOTIFICATION ERROR:",
-            e
-          );
-
-        }
-
         setText("");
 
-        setTimeout(() => {
-
-          flatListRef.current?.scrollToEnd(
-            {
-              animated: true,
-            }
-          );
-
-        }, 100);
+        setImage(null);
 
       } catch (e) {
 
-        console.log(e);
+        console.log(
+          "SEND ERROR:",
+          e
+        );
 
+      } finally {
+
+        setSending(false);
       }
     };
+
+  // TIME
 
   const getTime = (
     timestamp
@@ -327,6 +415,8 @@ export default function ChatScreen({
       }
     );
   };
+
+  // RENDER MESSAGE
 
   const renderItem =
     ({ item }) => {
@@ -356,11 +446,9 @@ export default function ChatScreen({
             >
 
               <Text
-                style={{
-                  color: "white",
-                  fontWeight:
-                    "bold",
-                }}
+                style={
+                  styles.avatarText
+                }
               >
                 {
                   item.senderName?.charAt(
@@ -374,7 +462,7 @@ export default function ChatScreen({
 
           <View
             style={[
-              styles.messageBubble,
+              styles.bubble,
 
               isMine
                 ? styles.myBubble
@@ -390,32 +478,42 @@ export default function ChatScreen({
                 }
               >
                 {
-                  item.senderName ||
-                  "Bruker"
+                  item.senderName
                 }
               </Text>
             )}
 
-            <Text
+            {!!item.text && (
 
-            numberOfLines={12}
+              <Text
+                style={[
+                  styles.messageText,
 
-            ellipsizeMode="tail"
+                  {
+                    color:
+                      isMine
+                        ? "#FFFFFF"
+                        : "#111827",
+                  },
+                ]}
+              >
+                {item.text}
+              </Text>
+            )}
 
-              style={[
+            {item.image && (
 
-                styles.messageText,
+              <Image
+                source={{
+                  uri:
+                    item.image,
+                }}
 
-                {
-                  color:
-                    isMine
-                      ? "white"
-                      : "#111827",
-                },
-              ]}
-            >
-              {item.text}
-            </Text>
+                style={
+                  styles.messageImage
+                }
+              />
+            )}
 
             <Text
               style={[
@@ -425,7 +523,7 @@ export default function ChatScreen({
                   color:
                     isMine
                       ? "rgba(255,255,255,0.7)"
-                      : "#6B7280",
+                      : "#9CA3AF",
                 },
               ]}
             >
@@ -436,24 +534,32 @@ export default function ChatScreen({
               }
             </Text>
 
-            {item.image && (
-
-              <Image
-                source={{
-                  uri:
-                    item.image,
-                }}
-                style={
-                  styles.image
-                }
-              />
-            )}
-
           </View>
 
         </View>
       );
     };
+
+  // LOADING
+
+  if (loading) {
+
+    return (
+
+      <View
+        style={
+          styles.loader
+        }
+      >
+
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
+        />
+
+      </View>
+    );
+  }
 
   return (
 
@@ -464,22 +570,19 @@ export default function ChatScreen({
     >
 
       <KeyboardAvoidingView
-  behavior={
-    Platform.OS === "ios"
-      ? "padding"
-      : "height"
-  }
+        behavior={
+          Platform.OS ===
+          "ios"
 
-  keyboardVerticalOffset={
-    Platform.OS === "ios"
-      ? 0
-      : 20
-  }
+            ? "padding"
 
-  style={{
-    flex: 1,
-  }}
->
+            : undefined
+        }
+
+        style={{
+          flex: 1,
+        }}
+      >
 
         {/* HEADER */}
 
@@ -495,44 +598,96 @@ export default function ChatScreen({
             }
           >
 
-            <Text
-              style={
-                styles.back
-              }
-            >
-              ←
-            </Text>
+            <Ionicons
+              name="arrow-back"
+              size={24}
+              color="#111827"
+            />
 
           </TouchableOpacity>
 
-          <View>
+          <View
+            style={
+              styles.headerCenter
+            }
+          >
 
-            <Text
+            <View
               style={
-                styles.headerTitle
+                styles.headerAvatar
               }
             >
-              {otherUser}
-            </Text>
 
-            <Text
-              style={
-                styles.online
-              }
-            >
-              Aktiv nå
-            </Text>
+              <Text
+                style={
+                  styles.headerAvatarText
+                }
+              >
+                {otherUser?.charAt(
+                  0
+                )}
+              </Text>
+
+              <View
+                style={
+                  styles.onlineDot
+                }
+              />
+
+            </View>
+
+            <View>
+
+              <Text
+                style={
+                  styles.headerName
+                }
+              >
+                {otherUser}
+              </Text>
+
+              <Text
+                style={
+                  styles.headerTask
+                }
+
+                numberOfLines={1}
+              >
+                {
+                  task?.title
+                }
+              </Text>
+
+            </View>
 
           </View>
 
         </View>
 
+        {/* TYPING */}
+
+        {isTyping && (
+
+          <View
+            style={
+              styles.typingContainer
+            }
+          >
+
+            <Text
+              style={
+                styles.typingText
+              }
+            >
+              {otherUser} skriver...
+            </Text>
+
+          </View>
+        )}
+
         {/* CHAT */}
 
         <FlatList
-
-          keyboardShouldPersistTaps="handled"
-
           ref={flatListRef}
 
           data={messages}
@@ -550,10 +705,57 @@ export default function ChatScreen({
           }
 
           contentContainerStyle={{
-            padding: 16,
-            paddingBottom: 120,
+            padding:
+              18,
+
+            paddingBottom:
+              140,
           }}
         />
+
+        {/* IMAGE PREVIEW */}
+
+        {image && (
+
+          <View
+            style={
+              styles.previewContainer
+            }
+          >
+
+            <Image
+              source={{
+                uri:
+                  image,
+              }}
+
+              style={
+                styles.previewImage
+              }
+            />
+
+            <TouchableOpacity
+              style={
+                styles.removeImage
+              }
+
+              onPress={() =>
+                setImage(
+                  null
+                )
+              }
+            >
+
+              <Ionicons
+                name="close"
+                size={18}
+                color="#FFFFFF"
+              />
+
+            </TouchableOpacity>
+
+          </View>
+        )}
 
         {/* INPUT */}
 
@@ -563,41 +765,131 @@ export default function ChatScreen({
           }
         >
 
-          <TextInput
-            multiline
-            maxLength={300}
-            placeholder="Skriv melding..."
+          <TouchableOpacity
+            onPress={
+              pickImage
+            }
 
+            style={
+              styles.imageButton
+            }
+          >
+
+            <Ionicons
+              name="image-outline"
+              size={22}
+              color="#6B7280"
+            />
+
+          </TouchableOpacity>
+
+          <TextInput
             value={text}
 
-            onChangeText={
-              setText
-            }
+            onChangeText={async (
+              value
+            ) => {
+
+              setText(value);
+
+              // TYPING TRUE
+
+              await setDoc(
+
+                typingRef,
+
+                {
+                  typing:
+                    true,
+
+                  userId:
+                    auth.currentUser
+                      ?.uid,
+                }
+              );
+
+              // CLEAR TIMER
+
+              if (
+                typingTimeout
+              ) {
+
+                clearTimeout(
+                  typingTimeout
+                );
+              }
+
+              // STOP TYPING
+
+              const timeout =
+                setTimeout(
+                  async () => {
+
+                    await setDoc(
+
+                      typingRef,
+
+                      {
+                        typing:
+                          false,
+
+                        userId:
+                          auth.currentUser
+                            ?.uid,
+                      }
+                    );
+
+                  },
+
+                  1400
+                );
+
+              setTypingTimeout(
+                timeout
+              );
+            }}
+
+            placeholder="Skriv melding..."
+
+            placeholderTextColor="#9CA3AF"
+
+            multiline
 
             style={
               styles.input
             }
-
-            placeholderTextColor="#9CA3AF"
           />
 
           <TouchableOpacity
-            style={
-              styles.sendButton
-            }
+            activeOpacity={0.9}
 
             onPress={
               sendMessage
             }
+
+            disabled={
+              sending
+            }
+
+            style={
+              styles.sendButton
+            }
           >
 
-            <Text
-              style={
-                styles.sendText
-              }
-            >
-              Send
-            </Text>
+            {sending ? (
+
+              <ActivityIndicator
+                color="#FFFFFF"
+              />
+
+            ) : (
+
+              <Ionicons
+                name="send"
+                size={20}
+                color="#FFFFFF"
+              />
+            )}
 
           </TouchableOpacity>
 
@@ -613,12 +905,29 @@ const styles =
   StyleSheet.create({
 
     container: {
+
       flex: 1,
+
       backgroundColor:
-        "#F3F4F6",
+        "#F6F7FB",
+    },
+
+    loader: {
+
+      flex: 1,
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      backgroundColor:
+        "#F6F7FB",
     },
 
     header: {
+
       flexDirection:
         "row",
 
@@ -627,46 +936,135 @@ const styles =
 
       paddingHorizontal: 20,
 
-      paddingTop: 18,
+      paddingTop:
+        Platform.OS === "android"
+          ? 50
+          : 12,
 
-      paddingBottom: 16,
+      paddingBottom: 18,
 
       backgroundColor:
-        "white",
+        "#FFFFFF",
 
       borderBottomWidth: 1,
 
       borderColor:
+        "#F3F4F6",
+    },
+
+    headerCenter: {
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      marginLeft: 16,
+
+      flex: 1,
+    },
+
+    headerAvatar: {
+
+      width: 52,
+
+      height: 52,
+
+      borderRadius: 18,
+
+      backgroundColor:
         "#E5E7EB",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      marginRight: 14,
+
+      position:
+        "relative",
     },
 
-    back: {
-      fontSize: 34,
+    headerAvatarText: {
 
-      marginRight: 18,
+      fontSize: 18,
+
+      fontWeight: "700",
 
       color:
         "#111827",
     },
 
-    headerTitle: {
-      fontSize: 22,
+    onlineDot: {
 
-      fontWeight:
-        "bold",
+      width: 12,
 
-      color:
-        "#111827",
-    },
+      height: 12,
 
-    online: {
-      color:
+      borderRadius: 999,
+
+      backgroundColor:
         "#22C55E",
 
-      marginTop: 2,
+      position:
+        "absolute",
+
+      right: 2,
+
+      bottom: 2,
+
+      borderWidth: 2,
+
+      borderColor:
+        "#FFFFFF",
+    },
+
+    headerName: {
+
+      fontSize: 17,
+
+      fontWeight: "700",
+
+      color:
+        "#111827",
+
+      marginBottom: 2,
+    },
+
+    headerTask: {
+
+      fontSize: 13,
+
+      color:
+        "#9CA3AF",
+
+      width: 180,
+    },
+
+    typingContainer: {
+
+      paddingHorizontal: 20,
+
+      paddingTop: 10,
+
+      paddingBottom: 2,
+    },
+
+    typingText: {
+
+      fontSize: 13,
+
+      color:
+        "#6B7280",
+
+      fontWeight: "600",
     },
 
     messageWrapper: {
+
       marginBottom: 14,
 
       flexDirection:
@@ -677,21 +1075,24 @@ const styles =
     },
 
     myWrapper: {
+
       justifyContent:
         "flex-end",
     },
 
     otherWrapper: {
+
       justifyContent:
         "flex-start",
     },
 
     avatar: {
+
       width: 34,
 
       height: 34,
 
-      borderRadius: 17,
+      borderRadius: 14,
 
       backgroundColor:
         "#2563EB",
@@ -705,58 +1106,65 @@ const styles =
       marginRight: 8,
     },
 
-    messageBubble: {
+    avatarText: {
+
+      color:
+        "#FFFFFF",
+
+      fontWeight: "700",
+    },
+
+    bubble: {
+
       maxWidth: "78%",
 
-      borderRadius: 30,
+      borderRadius: 26,
 
-      padding: 16,
+      paddingHorizontal: 16,
+
+      paddingVertical: 14,
     },
 
     myBubble: {
+
       backgroundColor:
         "#2563EB",
 
-      borderBottomRightRadius: 8,
+      borderBottomRightRadius: 10,
 
-      marginLeft: "auto",
+      marginLeft:
+        "auto",
     },
 
     otherBubble: {
-      backgroundColor:
-        "white",
 
-      borderBottomLeftRadius: 8,
+      backgroundColor:
+        "#FFFFFF",
+
+      borderBottomLeftRadius: 10,
     },
 
     senderName: {
-      fontSize: 14,
 
-      fontWeight:
-        "bold",
+      fontSize: 13,
 
-      marginBottom: 6,
+      fontWeight: "700",
 
       color:
         "#6B7280",
+
+      marginBottom: 6,
     },
 
     messageText: {
-      fontSize: 17,
+
+      fontSize: 16,
 
       lineHeight: 24,
     },
 
-    time: {
-      fontSize: 12,
+    messageImage: {
 
-      marginTop: 8,
-
-      alignSelf:
-        "flex-end",
-    },
-
-    image: {
       width: 220,
 
       height: 220,
@@ -766,71 +1174,55 @@ const styles =
       marginTop: 10,
     },
 
-    inputContainer: {
-      flexDirection:
-        "row",
+    time: {
 
-      alignItems:
-        "center",
+      fontSize: 11,
 
-      paddingHorizontal: 16,
+      marginTop: 8,
 
-      paddingTop: 12,
-
-      paddingBottom:
-        Platform.OS === "ios"
-          ? 28
-          : 46,
-
-      backgroundColor:
-        "white",
-
-      borderTopWidth: 1,
-
-      borderColor:
-        "#E5E7EB",
+      alignSelf:
+        "flex-end",
     },
 
-    input: {
-      flex: 1,
+    previewContainer: {
 
-      backgroundColor:
-        "#F3F4F6",
+      marginLeft: 16,
 
-      borderRadius: 20,
+      marginBottom: 10,
 
-      paddingHorizontal: 18,
+      position:
+        "relative",
 
-      minHeight: 58,
-
-      maxHeight: 120,
-
-      fontSize: 17,
-
-      marginRight: 10,
-
-      color:
-        "#111827",
+      alignSelf:
+        "flex-start",
     },
 
-    sendButton: {
-      backgroundColor:
-        "#2563EB",
+    previewImage: {
 
-      shadowColor:
-        "#2563EB",
+      width: 120,
 
-      shadowOpacity: 0.25,
-
-      shadowRadius: 8,
-
-      elevation: 6,
-
-      paddingHorizontal: 24,
-
-      height: 58,
+      height: 120,
 
       borderRadius: 20,
+    },
+
+    removeImage: {
+
+      position:
+        "absolute",
+
+      top: 8,
+
+      right: 8,
+
+      width: 28,
+
+      height: 28,
+
+      borderRadius: 999,
+
+      backgroundColor:
+        "rgba(0,0,0,0.7)",
 
       justifyContent:
         "center",
@@ -839,12 +1231,102 @@ const styles =
         "center",
     },
 
-    sendText: {
-      color: "white",
+    inputContainer: {
 
-      fontWeight:
-        "bold",
+      flexDirection:
+        "row",
 
-      fontSize: 17,
+      alignItems:
+        "flex-end",
+
+      paddingHorizontal: 16,
+
+      paddingTop: 12,
+
+      paddingBottom:
+        Platform.OS ===
+        "ios"
+
+          ? 28
+
+          : 42,
+
+      backgroundColor:
+        "#FFFFFF",
+
+      borderTopWidth: 1,
+
+      borderColor:
+        "#F3F4F6",
+    },
+
+    imageButton: {
+
+      width: 46,
+
+      height: 46,
+
+      borderRadius: 16,
+
+      backgroundColor:
+        "#F3F4F6",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      marginRight: 10,
+    },
+
+    input: {
+
+      flex: 1,
+
+      backgroundColor:
+        "#F3F4F6",
+
+      borderRadius: 24,
+
+      paddingHorizontal: 18,
+
+      paddingVertical: 16,
+
+      fontSize: 16,
+
+      color:
+        "#111827",
+
+      maxHeight: 120,
+
+      marginRight: 12,
+    },
+
+    sendButton: {
+
+      width: 54,
+
+      height: 54,
+
+      borderRadius: 20,
+
+      backgroundColor:
+        "#2563EB",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      shadowColor:
+        "#2563EB",
+
+      shadowOpacity: 0.25,
+
+      shadowRadius: 10,
+
+      elevation: 6,
     },
   });

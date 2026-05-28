@@ -4,8 +4,9 @@ import {
   getDownloadURL,
 } from "firebase/storage";
 
-import { LinearGradient }
-from "expo-linear-gradient";
+import {
+  LinearGradient,
+} from "expo-linear-gradient";
 
 import React, {
   useEffect,
@@ -14,7 +15,6 @@ import React, {
 
 import {
   View,
-  Animated,
   Text,
   StyleSheet,
   TouchableOpacity,
@@ -24,6 +24,8 @@ import {
   Modal,
   TextInput,
   Keyboard,
+  Platform,
+  ActivityIndicator,
 } from "react-native";
 
 import {
@@ -34,7 +36,7 @@ import {
 import {
   auth,
   db,
-  storage, 
+  storage,
 } from "../firebaseConfig";
 
 import {
@@ -60,12 +62,11 @@ import * as ImagePicker from "expo-image-picker";
 
 export default function ProfileScreen() {
 
-
   const [userData, setUserData] =
     useState(null);
 
   const [loading, setLoading] =
-  useState(false);
+    useState(false);
 
   const [reviews, setReviews] =
     useState([]);
@@ -79,8 +80,16 @@ export default function ProfileScreen() {
   const [newName, setNewName] =
     useState("");
 
+  const [newBio, setNewBio] =
+    useState("");
+
   const [newPassword, setNewPassword] =
     useState("");
+
+  const [
+    currentPassword,
+    setCurrentPassword,
+  ] = useState("");
 
   const [
     showNameModal,
@@ -92,24 +101,15 @@ export default function ProfileScreen() {
     setShowPasswordModal,
   ] = useState(false);
 
-  const [
-  showSettingsModal,
-  setShowSettingsModal,
-] = useState(false);
-
-const [
-  currentPassword,
-  setCurrentPassword,
-] = useState("");
-
-  // LOAD USER
   useEffect(() => {
 
     const fetchUser =
       async () => {
 
-        if (!auth.currentUser)
-  return;
+        if (
+          !auth.currentUser
+        )
+          return;
 
         try {
 
@@ -139,9 +139,14 @@ const [
             setNewName(
               data.name || ""
             );
+
+            setNewBio(
+              data.bio || ""
+            );
           }
 
         } catch (e) {
+
           console.log(e);
         }
       };
@@ -151,6 +156,7 @@ const [
   }, []);
 
   // LOAD REVIEWS
+
   useEffect(() => {
 
     if (
@@ -174,6 +180,7 @@ const [
     const unsubscribe =
       onSnapshot(
         q,
+
         (snapshot) => {
 
           const loadedReviews =
@@ -181,7 +188,9 @@ const [
               (
                 document
               ) => ({
-                id: document.id,
+                id:
+                  document.id,
+
                 ...document.data(),
               })
             );
@@ -201,6 +210,7 @@ const [
                   sum,
                   review
                 ) =>
+
                   sum +
                   (review.rating ||
                     5),
@@ -225,121 +235,109 @@ const [
   }, []);
 
   // PICK IMAGE
+
   const pickImage =
-  async () => {
-
-    try {
-
-      const result =
-        await ImagePicker.launchImageLibraryAsync(
-          {
-            mediaTypes: [
-              "images",
-            ],
-
-            allowsEditing:
-              true,
-
-            aspect: [1, 1],
-
-            quality: 0.7,
-          }
-        );
-
-      if (
-        result.canceled
-      )
-        return;
-
-      const uri =
-        result.assets[0]
-          .uri;
-
-      setImage(uri);
-
-      // FETCH IMAGE
-      const response =
-        await fetch(
-          uri
-        );
-
-      const blob =
-        await response.blob();
-
-      // STORAGE REF
-      const storageRef =
-        ref(
-          storage,
-
-          `avatars/${auth.currentUser.uid}`
-        );
-
-      // UPLOAD
-      await uploadBytes(
-        storageRef,
-        blob
-      );
-
-      // GET URL
-      const downloadURL =
-        await getDownloadURL(
-          storageRef
-        );
-
-      // SAVE TO FIRESTORE
-      await setDoc(
-        doc(
-          db,
-          "users",
-          auth.currentUser.uid
-        ),
-
-        {
-          avatar:
-            downloadURL,
-        },
-
-        {
-          merge: true,
-        }
-      );
-
-      // UPDATE LOCAL
-      setUserData({
-        ...userData,
-
-        avatar:
-          downloadURL,
-      });
-
-      Alert.alert(
-        "Profilbilde oppdatert 😄"
-      );
-
-    } catch (e) {
-
-      console.log(e);
-
-      Alert.alert(
-        "Kunne ikke laste opp bilde"
-      );
-    }
-  };
-
-  // SAVE NAME
-  const saveName =
     async () => {
 
       try {
 
-        if (
-          !newName.trim()
-        ) {
+        const result =
+          await ImagePicker.launchImageLibraryAsync(
+            {
+              mediaTypes:
+                ImagePicker.MediaType.Images,
 
-          return Alert.alert(
-            "Skriv inn navn"
+              allowsEditing:
+                true,
+
+              aspect: [1, 1],
+
+              quality: 0.7,
+            }
           );
-        }
+
+        if (
+          result.canceled
+        )
+          return;
+
+        setLoading(true);
+
+        const uri =
+          result.assets[0]
+            .uri;
+
+        setImage(uri);
+
+        const response =
+          await fetch(
+            uri
+          );
+
+        const blob =
+          await response.blob();
+
+        const storageRef =
+          ref(
+            storage,
+
+            `avatars/${auth.currentUser.uid}`
+          );
+
+        await uploadBytes(
+          storageRef,
+          blob
+        );
+
+        const downloadURL =
+          await getDownloadURL(
+            storageRef
+          );
+
+        await setDoc(
+          doc(
+            db,
+            "users",
+            auth.currentUser.uid
+          ),
+
+          {
+            avatar:
+              downloadURL,
+          },
+
+          {
+            merge: true,
+          }
+        );
+
+        setUserData({
+          ...userData,
+
+          avatar:
+            downloadURL,
+        });
+
+        Alert.alert(
+          "Profilbilde oppdatert 😄"
+        );
+
+      } catch (e) {
+
+        console.log(e);
+
+      } finally {
+
+        setLoading(false);
+      }
+    };
+
+  // SAVE PROFILE
+
+  const saveProfile =
+    async () => {
+
+      try {
 
         Keyboard.dismiss();
 
@@ -353,6 +351,9 @@ const [
           {
             name:
               newName.trim(),
+
+            bio:
+              newBio.trim(),
           },
 
           {
@@ -373,7 +374,10 @@ const [
           ...userData,
 
           name:
-            newName.trim(),
+            newName,
+
+          bio:
+            newBio,
         });
 
         setShowNameModal(
@@ -381,116 +385,79 @@ const [
         );
 
       } catch (e) {
+
         console.log(e);
       }
     };
 
   // CHANGE PASSWORD
+
   const changePassword =
-  async () => {
+    async () => {
 
-    try {
+      try {
 
-      if (
-        currentPassword.length <
-        6
-      ) {
+        const credential =
+          EmailAuthProvider.credential(
 
-        return Alert.alert(
-          "Skriv inn nåværende passord"
+            auth.currentUser.email,
+
+            currentPassword
+          );
+
+        await reauthenticateWithCredential(
+          auth.currentUser,
+          credential
+        );
+
+        await updatePassword(
+          auth.currentUser,
+          newPassword
+        );
+
+        Alert.alert(
+          "Passord oppdatert 😄"
+        );
+
+        setShowPasswordModal(
+          false
+        );
+
+      } catch (e) {
+
+        console.log(e);
+
+        Alert.alert(
+          "Feil passord"
         );
       }
-
-      if (
-        newPassword.length <
-        6
-      ) {
-
-        return Alert.alert(
-          "Nytt passord må være minst 6 tegn"
-        );
-      }
-
-      if (!auth.currentUser) {
-
-  return Alert.alert(
-    "Logg inn igjen 😄"
-  );
-}
-
-      const credential =
-        EmailAuthProvider.credential(
-
-          auth.currentUser.email,
-
-          currentPassword
-        );
-
-      await reauthenticateWithCredential(
-        auth.currentUser,
-        credential
-      );
-
-      await updatePassword(
-        auth.currentUser,
-        newPassword
-      );
-
-      await signOut(auth);
-
-Alert.alert(
-  "Passord oppdatert 😄",
-  "Logg inn igjen."
-);
-
-      setCurrentPassword("");
-      setNewPassword("");
-
-      Alert.alert(
-        "Passord oppdatert 🔥"
-      );
-
-      await signOut(auth);
-
-    } catch (e) {
-
-      console.log(e);
-
-      Alert.alert(
-        "Feil passord"
-      );
-    }
-  };
+    };
 
   // LOGOUT
 
-const logout =
-  async () => {
+  const logout =
+    async () => {
 
-    try {
+      try {
 
-      setLoading(true);
+        setLoading(true);
 
-      await signOut(auth);
+        await signOut(
+          auth
+        );
 
-    } catch (e) {
+      } catch (e) {
 
-      console.log(
-        "LOGOUT ERROR:",
-        e
-      );
+        console.log(e);
 
-      Alert.alert(
-        "Logout feilet"
-      );
+      } finally {
 
-    } finally {
-
-      setLoading(false);
-    }
-};
+        setLoading(false);
+      }
+    };
 
   // DELETE ACCOUNT
+
   const removeAccount =
     () => {
 
@@ -526,9 +493,7 @@ const logout =
 
                 } catch (e) {
 
-                  console.log(
-                    e
-                  );
+                  console.log(e);
                 }
               },
           },
@@ -542,9 +507,11 @@ const logout =
       style={
         styles.container
       }
+
       contentContainerStyle={{
         paddingBottom: 140,
       }}
+
       showsVerticalScrollIndicator={
         false
       }
@@ -552,160 +519,209 @@ const logout =
 
       {/* HERO */}
 
-<LinearGradient
-  colors={[
-    "#2563EB",
-    "#3B82F6",
-    "#60A5FA",
-  ]}
+      <LinearGradient
+        colors={[
+          "#2563EB",
+          "#3B82F6",
+          "#60A5FA",
+        ]}
 
-  style={{
-    paddingTop: 90,
-
-    paddingBottom: 120,
-
-    borderBottomLeftRadius: 40,
-
-    borderBottomRightRadius: 40,
-
-    alignItems:
-      "center",
-
-    marginBottom: -70,
-  }}
->
-
-  <TouchableOpacity
-    onPress={
-      pickImage
-    }
-    activeOpacity={0.8}
-  >
-
-    <View>
-
-      <Image
-        source={{
-          uri:
-            image ||
-
-            userData?.avatar ||
-
-            "https://i.pravatar.cc/300",
-        }}
-
-        style={{
-          width: 120,
-
-          height: 120,
-
-          borderRadius: 60,
-
-          borderWidth: 4,
-
-          borderColor:
-            "white",
-
-          marginBottom: 18,
-        }}
-      />
-
-      {userData?.verified && (
-
-        <View
-          style={{
-            position:
-              "absolute",
-
-            bottom: 20,
-
-            right: 0,
-
-            width: 32,
-
-            height: 32,
-
-            borderRadius: 16,
-
-            backgroundColor:
-              "#22C55E",
-
-            justifyContent:
-              "center",
-
-            alignItems:
-              "center",
-
-            borderWidth: 3,
-
-            borderColor:
-              "white",
-          }}
-        >
-
-          <Ionicons
-            name="checkmark"
-            size={16}
-            color="white"
-          />
-
-        </View>
-      )}
-
-    </View>
-
-  </TouchableOpacity>
-
-  <Text
-    style={{
-      color:
-        "white",
-
-      fontSize: 34,
-
-      fontWeight:
-        "800",
-
-      marginTop: 10,
-    }}
-  >
-    {userData?.name ||
-      "Bruker"}
-  </Text>
-
-  <Text
-    style={{
-      color:
-        "rgba(255,255,255,0.85)",
-
-      marginTop: 8,
-
-      fontSize: 16,
-    }}
-  >
-    Hjelper folk i nærheten 😄
-  </Text>
-
-</LinearGradient>
-
-      {/* HEADER */}
-      <View
         style={
-          styles.header
+          styles.hero
         }
       >
 
-        <Text
-          style={
-            styles.headerTitle
+        <TouchableOpacity
+          onPress={
+            pickImage
+          }
+
+          activeOpacity={
+            0.8
           }
         >
-          Profil
+
+          <Image
+            source={{
+              uri:
+                image ||
+
+                userData?.avatar ||
+
+                "https://i.pravatar.cc/300",
+            }}
+
+            style={
+              styles.avatar
+            }
+          />
+
+          <View
+            style={
+              styles.editAvatar
+            }
+          >
+
+            <Ionicons
+              name="camera"
+              size={18}
+              color="#FFFFFF"
+            />
+
+          </View>
+
+          {/* VERIFIED */}
+
+          <View
+            style={
+              styles.verifiedBadge
+            }
+          >
+
+            <Ionicons
+              name="checkmark"
+              size={14}
+              color="#FFFFFF"
+            />
+
+          </View>
+
+        </TouchableOpacity>
+
+        <Text
+          style={
+            styles.name
+          }
+        >
+          {userData?.name ||
+            "Bruker"}
         </Text>
+
+        <Text
+          style={
+            styles.bio
+          }
+        >
+          {userData?.bio ||
+
+            "Hjelper folk i nærheten 😄"}
+        </Text>
+
+      </LinearGradient>
+
+      {/* TRUST */}
+
+      <View
+        style={
+          styles.trustContainer
+        }
+      >
+
+        <View
+          style={
+            styles.trustCard
+          }
+        >
+
+          <View
+            style={
+              styles.trustIcon
+            }
+          >
+
+            <Ionicons
+              name="shield-checkmark"
+              size={26}
+              color="#2563EB"
+            />
+
+          </View>
+
+          <View
+            style={{
+              flex: 1,
+            }}
+          >
+
+            <Text
+              style={
+                styles.trustTitle
+              }
+            >
+              Verifisert bruker
+            </Text>
+
+            <Text
+              style={
+                styles.trustSubtitle
+              }
+            >
+              Trygg og aktiv hjelper 😄
+            </Text>
+
+          </View>
+
+        </View>
+
+        <View
+          style={
+            styles.levelCard
+          }
+        >
+
+          <View
+            style={
+              styles.levelTop
+            }
+          >
+
+            <Text
+              style={
+                styles.levelTitle
+              }
+            >
+              Helper level
+            </Text>
+
+            <Text
+              style={
+                styles.levelBadge
+              }
+            >
+              🔥 Pro
+            </Text>
+
+          </View>
+
+          <View
+            style={
+              styles.levelBar
+            }
+          >
+
+            <View
+              style={
+                styles.levelProgress
+              }
+            />
+
+          </View>
+
+          <Text
+            style={
+              styles.levelText
+            }
+          >
+            {userData?.completedTasks || 0}
+            /50 oppdrag fullført
+          </Text>
+
+        </View>
 
       </View>
 
       {/* STATS */}
+
       <View
         style={
           styles.statsContainer
@@ -717,51 +733,7 @@ const logout =
             styles.statBox
           }
         >
-          <Text
-            style={
-              styles.statNumber
-            }
-          >
-            {userData?.completedTasks ||
-              0}
-          </Text>
 
-          <Text
-            style={
-              styles.statLabel
-            }
-          >
-            Fullførte
-          </Text>
-        </View>
-
-        <View
-          style={
-            styles.statBox
-          }
-        >
-          <Text
-            style={
-              styles.statNumber
-            }
-          >
-            {reviews.length}
-          </Text>
-
-          <Text
-            style={
-              styles.statLabel
-            }
-          >
-            Hjulpet
-          </Text>
-        </View>
-
-        <View
-          style={
-            styles.statBox
-          }
-        >
           <Text
             style={
               styles.statNumber
@@ -777,576 +749,65 @@ const logout =
           >
             Rating
           </Text>
+
+        </View>
+
+        <View
+          style={
+            styles.statBox
+          }
+        >
+
+          <Text
+            style={
+              styles.statNumber
+            }
+          >
+            {
+              userData?.completedTasks ||
+              0
+            }
+          </Text>
+
+          <Text
+            style={
+              styles.statLabel
+            }
+          >
+            Oppdrag
+          </Text>
+
+        </View>
+
+        <View
+          style={
+            styles.statBox
+          }
+        >
+
+          <Text
+            style={
+              styles.statNumber
+            }
+          >
+            {
+              reviews.length
+            }
+          </Text>
+
+          <Text
+            style={
+              styles.statLabel
+            }
+          >
+            Reviews
+          </Text>
+
         </View>
 
       </View>
-
-{/* MENU */}
-
-<View
-  style={
-    styles.menuContainer
-  }
->
-
-  <MenuItem
-    icon="shield-checkmark-outline"
-    title="Verifisert"
-
-    onPress={() =>
-
-      Alert.alert(
-        "Verifisering",
-        "Kommer snart 😄"
-      )
-    }
-  />
-
-  <MenuItem
-    icon="card-outline"
-    title="Betalinger"
-
-    onPress={() =>
-
-      Alert.alert(
-        "Betalinger",
-        "Stripe kommer snart 💳"
-      )
-    }
-  />
-
-  <MenuItem
-    icon="settings-outline"
-    title="Innstillinger"
-
-    onPress={() =>
-      setShowSettingsModal(
-        true
-      )
-    }
-  />
-
-  <MenuItem
-    icon="help-circle-outline"
-    title="Hjelp & support"
-
-    onPress={() =>
-
-      Alert.alert(
-        "Support",
-        "Kontakt oss på support@naer.no 😄"
-      )
-    }
-  />
-
-</View>
-      {/* BUTTONS */}
-      <TouchableOpacity
-        style={
-          styles.logoutButton
-        }
-        onPress={
-          logout
-        }
-      >
-        <Text
-          style={
-            styles.logoutText
-          }
-        >
-          Logg ut
-        </Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={
-          styles.deleteButton
-        }
-        onPress={
-          removeAccount
-        }
-      >
-        <Text
-          style={
-            styles.deleteText
-          }
-        >
-          Slett bruker
-        </Text>
-      </TouchableOpacity>
-
-      {/* SETTINGS MODAL */}
-
-<Modal
-  visible={
-    showSettingsModal
-  }
-
-  transparent
-
-  animationType="fade"
->
-
-  <View
-    style={
-      styles.modalOverlay
-    }
-  >
-
-    <View
-      style={
-        styles.modalContent
-      }
-    >
-
-      <TouchableOpacity
-  onPress={() =>
-    setShowSettingsModal(
-      false
-    )
-  }
-
-  style={{
-    position:
-      "absolute",
-
-    top: 18,
-
-    right: 18,
-
-    zIndex: 10,
-  }}
->
-
-  <Ionicons
-    name="close"
-    size={28}
-    color="#111827"
-  />
-
-</TouchableOpacity>
-
-      <Text
-        style={
-          styles.modalTitle
-        }
-      >
-        Innstillinger
-      </Text>
-
-      <TouchableOpacity
-  style={
-    styles.settingButton
-  }
-
-  activeOpacity={0.8}
-
-  onPress={() => {
-
-    setShowSettingsModal(
-      false
-    );
-
-    setShowNameModal(
-      true
-    );
-  }}
->
-
-  <View
-    style={{
-      flexDirection:
-        "row",
-
-      alignItems:
-        "center",
-    }}
-  >
-
-    <Text
-      style={{
-        fontSize: 20,
-
-        marginRight: 10,
-      }}
-    >
-      👤
-    </Text>
-
-    <Text
-      style={
-        styles.settingText
-      }
-    >
-      Endre navn
-    </Text>
-
-  </View>
-
-</TouchableOpacity>
-
-      <TouchableOpacity
-  style={
-    styles.settingButton
-  }
-
-  activeOpacity={0.8}
-
-  onPress={() => {
-
-    setShowSettingsModal(
-      false
-    );
-
-    setShowPasswordModal(
-      true
-    );
-  }}
->
-
-  <View
-    style={{
-      flexDirection:
-        "row",
-
-      alignItems:
-        "center",
-    }}
-  >
-
-    <Text
-      style={{
-        fontSize: 20,
-
-        marginRight: 10,
-      }}
-    >
-      🔒
-    </Text>
-
-    <Text
-      style={
-        styles.settingText
-      }
-    >
-      Endre passord
-    </Text>
-
-  </View>
-
-</TouchableOpacity>
-
-      <TouchableOpacity
-  style={
-    styles.settingButton
-  }
-
-  activeOpacity={0.8}
-
-  onPress={() =>
-
-    Alert.alert(
-      "Språk",
-      "English kommer snart 🇬🇧"
-    )
-  }
->
-
-  <View
-  style={{
-    flexDirection:
-      "row",
-
-    alignItems:
-      "center",
-  }}
->
-
-    <Text
-      style={{
-        fontSize: 20,
-
-        marginRight: 10,
-      }}
-    >
-      🌍
-    </Text>
-
-    <Text
-      style={
-        styles.settingText
-      }
-    >
-      Language: Norsk
-    </Text>
-
-  </View>
-
-</TouchableOpacity>
-
-    </View>
-
-  </View>
-
-</Modal>
-
-      {/* NAME MODAL */}
-      <Modal
-        visible={
-          showNameModal
-        }
-        transparent
-        animationType="fade"
-      >
-
-        <View
-          style={
-            styles.modalOverlay
-          }
-        >
-
-          <View
-            style={
-              styles.modalContent
-            }
-          >
-
-          <TouchableOpacity
-  onPress={() =>
-    setShowNameModal(
-      false
-    )
-  }
-
-  style={{
-    position:
-      "absolute",
-
-    top: 18,
-
-    right: 18,
-
-    zIndex: 10,
-  }}
->
-
-  <Ionicons
-    name="close"
-    size={28}
-    color="#111827"
-  />
-
-</TouchableOpacity>
-
-            <Text
-              style={
-                styles.modalTitle
-              }
-            >
-              Endre navn
-            </Text>
-
-            <TextInput
-              value={newName}
-              onChangeText={
-                setNewName
-              }
-              placeholder="Nytt navn"
-              style={
-                styles.input
-              }
-            />
-
-            <TouchableOpacity
-              style={
-                styles.saveButton
-              }
-              onPress={
-                saveName
-              }
-            >
-              <Text
-                style={
-                  styles.saveText
-                }
-              >
-                Lagre
-              </Text>
-            </TouchableOpacity>
-
-          </View>
-
-        </View>
-
-      </Modal>
-
-      {/* PASSWORD MODAL */}
-
-      <Modal
-        visible={
-          showPasswordModal
-        }
-        transparent
-        animationType="fade"
-      >
-
-        <View
-          style={
-            styles.modalOverlay
-          }
-        >
-
-          <View
-            style={
-              styles.modalContent
-            }
-          >
-
-            <TouchableOpacity
-  onPress={() =>
-    setShowPasswordModal(
-      false
-    )
-  }
-
-  style={{
-    position:
-      "absolute",
-
-    top: 18,
-
-    right: 18,
-
-    zIndex: 10,
-  }}
->
-
-  <Ionicons
-    name="close"
-    size={28}
-    color="#111827"
-  />
-
-</TouchableOpacity>
-
-            <Text
-              style={
-                styles.modalTitle
-              }
-            >
-              Bytt passord
-            </Text>
-
-              <TextInput
-  secureTextEntry
-
-  value={
-    currentPassword
-  }
-
-  onChangeText={
-    setCurrentPassword
-  }
-
-  placeholder=
-    "Nåværende passord"
-
-  style={
-    styles.input
-  }
-/>
-
-            <TextInput
-              secureTextEntry
-              value={
-                newPassword
-              }
-              onChangeText={
-                setNewPassword
-              }
-              placeholder="Nytt passord"
-              style={
-                styles.input
-              }
-            />
-
-            <TouchableOpacity
-              style={
-                styles.saveButton
-              }
-              onPress={
-                changePassword
-              }
-            >
-              <Text
-                style={
-                  styles.saveText
-                }
-              >
-                Lagre passord
-              </Text>
-            </TouchableOpacity>
-
-          </View>
-
-        </View>
-
-      </Modal>
 
     </ScrollView>
-  );
-}
-
-function MenuItem({
-  icon,
-  title,
-  onPress,
-}) {
-
-  return (
-
-    <TouchableOpacity
-      style={
-        styles.menuItem
-      }
-      activeOpacity={0.8}
-      onPress={
-        onPress
-      }
-      activeOpacity={
-        0.7
-      }
-    >
-
-      <View
-        style={
-          styles.menuLeft
-        }
-      >
-
-        <Ionicons
-          name={icon}
-          size={22}
-          color="#111827"
-        />
-
-        <Text
-          style={
-            styles.menuText
-          }
-        >
-          {title}
-        </Text>
-
-      </View>
-
-      <Feather
-        name="chevron-right"
-        size={20}
-        color="#9CA3AF"
-      />
-
-    </TouchableOpacity>
   );
 }
 
@@ -1354,88 +815,281 @@ const styles =
   StyleSheet.create({
 
     container: {
+
       flex: 1,
 
       backgroundColor:
         "#F8FAFC",
     },
 
-    header: {
-      paddingTop: 70,
+    hero: {
 
-      paddingHorizontal: 24,
+      paddingTop:
+        Platform.OS ===
+        "android"
 
-      marginBottom: 30,
-    },
+          ? 70
 
-    headerTitle: {
-      fontSize: 34,
+          : 90,
 
-      fontWeight:
-        "700",
+      paddingBottom: 120,
 
-      color: "#0F172A",
-    },
+      borderBottomLeftRadius: 40,
 
-    profileSection: {
+      borderBottomRightRadius: 40,
+
       alignItems:
         "center",
 
-      marginBottom: 34,
+      marginBottom: -70,
     },
 
     avatar: {
+
       width: 120,
 
       height: 120,
 
       borderRadius: 60,
+
+      borderWidth: 4,
+
+      borderColor:
+        "#FFFFFF",
+    },
+
+    editAvatar: {
+
+      width: 38,
+
+      height: 38,
+
+      borderRadius: 19,
+
+      backgroundColor:
+        "#111827",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      position:
+        "absolute",
+
+      bottom: 0,
+
+      right: 0,
     },
 
     verifiedBadge: {
-    position: "absolute",
 
-    bottom: 6,
+      position:
+        "absolute",
 
-    right: 6,
+      top: 4,
 
-    width: 28,
+      right: 4,
 
-    height: 28,
+      width: 32,
 
-    borderRadius: 14,
+      height: 32,
 
-    backgroundColor: "#22C55E",
+      borderRadius: 999,
 
-    justifyContent: "center",
+      backgroundColor:
+        "#2563EB",
 
-    alignItems: "center",
+      justifyContent:
+        "center",
 
-    borderWidth: 2,
+      alignItems:
+        "center",
 
-    borderColor: "white",
-  },
+      borderWidth: 3,
+
+      borderColor:
+        "#FFFFFF",
+    },
 
     name: {
-      fontSize: 28,
 
-      fontWeight:
-        "700",
+      color:
+        "#FFFFFF",
 
-      color: "#111827",
+      fontSize: 34,
+
+      fontWeight: "800",
 
       marginTop: 18,
     },
 
-    rating: {
+    bio: {
+
+      color:
+        "rgba(255,255,255,0.85)",
+
       marginTop: 8,
 
       fontSize: 16,
 
-      color: "#6B7280",
+      paddingHorizontal: 30,
+
+      textAlign:
+        "center",
+    },
+
+    trustContainer: {
+
+      marginHorizontal: 24,
+
+      marginBottom: 28,
+    },
+
+    trustCard: {
+
+      backgroundColor:
+        "#FFFFFF",
+
+      borderRadius: 28,
+
+      padding: 20,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      marginBottom: 16,
+
+      elevation: 4,
+    },
+
+    trustIcon: {
+
+      width: 58,
+
+      height: 58,
+
+      borderRadius: 20,
+
+      backgroundColor:
+        "#EFF6FF",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      marginRight: 16,
+    },
+
+    trustTitle: {
+
+      fontSize: 17,
+
+      fontWeight: "800",
+
+      color:
+        "#111827",
+
+      marginBottom: 4,
+    },
+
+    trustSubtitle: {
+
+      fontSize: 14,
+
+      color:
+        "#6B7280",
+    },
+
+    levelCard: {
+
+      backgroundColor:
+        "#111827",
+
+      borderRadius: 28,
+
+      padding: 22,
+    },
+
+    levelTop: {
+
+      flexDirection:
+        "row",
+
+      justifyContent:
+        "space-between",
+
+      alignItems:
+        "center",
+
+      marginBottom: 18,
+    },
+
+    levelTitle: {
+
+      fontSize: 18,
+
+      fontWeight: "800",
+
+      color:
+        "#FFFFFF",
+    },
+
+    levelBadge: {
+
+      fontSize: 15,
+
+      fontWeight: "700",
+
+      color:
+        "#FFFFFF",
+    },
+
+    levelBar: {
+
+      height: 12,
+
+      borderRadius: 999,
+
+      backgroundColor:
+        "rgba(255,255,255,0.12)",
+
+      overflow:
+        "hidden",
+
+      marginBottom: 12,
+    },
+
+    levelProgress: {
+
+      width: "42%",
+
+      height: "100%",
+
+      borderRadius: 999,
+
+      backgroundColor:
+        "#22C55E",
+    },
+
+    levelText: {
+
+      color:
+        "rgba(255,255,255,0.78)",
+
+      fontSize: 14,
+
+      fontWeight: "600",
     },
 
     statsContainer: {
+
       flexDirection:
         "row",
 
@@ -1445,9 +1099,9 @@ const styles =
       marginHorizontal: 24,
 
       backgroundColor:
-        "white",
+        "#FFFFFF",
 
-      borderRadius: 26,
+      borderRadius: 28,
 
       paddingVertical: 24,
 
@@ -1457,6 +1111,7 @@ const styles =
     },
 
     statBox: {
+
       flex: 1,
 
       alignItems:
@@ -1464,215 +1119,22 @@ const styles =
     },
 
     statNumber: {
+
       fontSize: 26,
 
-      fontWeight:
-        "700",
+      fontWeight: "800",
 
-      color: "#111827",
+      color:
+        "#111827",
     },
 
     statLabel: {
+
       marginTop: 6,
 
-      color: "#6B7280",
+      color:
+        "#6B7280",
 
       fontSize: 14,
     },
-
-    menuContainer: {
-      backgroundColor:
-        "white",
-
-      marginHorizontal: 24,
-
-      borderRadius: 26,
-
-      paddingVertical: 8,
-
-      marginBottom: 30,
-
-      elevation: 4,
-    },
-
-    menuItem: {
-      flexDirection:
-        "row",
-
-      justifyContent:
-        "space-between",
-
-      alignItems:
-        "center",
-
-      paddingHorizontal: 20,
-
-      paddingVertical: 20,
-
-      borderBottomWidth: 1,
-
-      borderBottomColor:
-        "#F1F5F9",
-    },
-
-    menuLeft: {
-      flexDirection:
-        "row",
-
-      alignItems:
-        "center",
-    },
-
-    menuText: {
-      marginLeft: 14,
-
-      fontSize: 16,
-
-      color: "#111827",
-
-      fontWeight:
-        "500",
-    },
-
-    logoutButton: {
-      marginHorizontal: 24,
-
-      backgroundColor:
-        "#0F172A",
-
-      paddingVertical: 18,
-
-      borderRadius: 18,
-
-      alignItems:
-        "center",
-
-      marginBottom: 14,
-    },
-
-    logoutText: {
-      color: "white",
-
-      fontWeight:
-        "700",
-
-      fontSize: 16,
-    },
-
-    deleteButton: {
-      marginHorizontal: 24,
-
-      backgroundColor:
-        "#EF4444",
-
-      paddingVertical: 18,
-
-      borderRadius: 18,
-
-      alignItems:
-        "center",
-    },
-
-    deleteText: {
-      color: "white",
-
-      fontWeight:
-        "700",
-
-      fontSize: 16,
-    },
-
-    modalOverlay: {
-      flex: 1,
-
-      justifyContent:
-        "center",
-
-      backgroundColor:
-        "rgba(0,0,0,0.45)",
-
-      padding: 24,
-    },
-
-    modalContent: {
-      backgroundColor:
-        "white",
-
-      borderRadius: 28,
-
-      padding: 24,
-    },
-
-    modalTitle: {
-      fontSize: 24,
-
-      fontWeight:
-        "700",
-
-      marginBottom: 20,
-
-      color: "#111827",
-    },
-
-    input: {
-      backgroundColor:
-        "#F1F5F9",
-
-      borderRadius: 18,
-
-      padding: 16,
-
-      marginBottom: 20,
-
-      fontSize: 16,
-    },
-
-    saveButton: {
-      backgroundColor:
-        "#22C55E",
-
-      paddingVertical: 16,
-
-      borderRadius: 18,
-
-      alignItems:
-        "center",
-    },
-
-    saveText: {
-      color: "white",
-
-      fontWeight:
-        "700",
-
-      fontSize: 16,
-    },
-
-    settingButton: {
-
-  backgroundColor:
-    "#F1F5F9",
-
-  paddingVertical: 18,
-
-  borderRadius: 18,
-
-  alignItems:
-    "center",
-
-  marginBottom: 14,
-},
-
-settingText: {
-
-  fontSize: 16,
-
-  fontWeight:
-    "600",
-
-  color:
-    "#111827",
-},
-
-});
-
+  });

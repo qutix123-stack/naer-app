@@ -2,28 +2,38 @@ import React, {
   useState,
 } from "react";
 
-import {
-  Text,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  Image,
-  Alert,
-  ActivityIndicator,
-  View,
-  Switch,
-} from "react-native";
-
 import * as ImagePicker from "expo-image-picker";
+
 import * as Location from "expo-location";
 
 import {
-  collection,
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  ActivityIndicator,
+  Image,
+  Platform,
+} from "react-native";
+
+import {
+  Ionicons,
+} from "@expo/vector-icons";
+
+import {
+  LinearGradient,
+} from "expo-linear-gradient";
+
+import {
   addDoc,
+  collection,
+  serverTimestamp,
 } from "firebase/firestore";
 
 import {
-  getStorage,
   ref,
   uploadBytes,
   getDownloadURL,
@@ -32,21 +42,8 @@ import {
 import {
   auth,
   db,
+  storage,
 } from "../firebaseConfig";
-
-const storage =
-  getStorage();
-
-const categories = [
-  { label: "🚚 Flytting", value: "Flytting" },
-  { label: "🧹 Rengjøring", value: "Rengjøring" },
-  { label: "💻 IT", value: "IT" },
-  { label: "🛒 Handling", value: "Levering" },
-  { label: "🌳 Hage", value: "Hage" },
-  { label: "📦 Bæring", value: "Bæring" },
-  { label: "🐶 Dyrepass", value: "Dyrepass" },
-  { label: "🔧 Annet", value: "Annet" },
-];
 
 export default function CreateTaskScreen({
   navigation,
@@ -55,11 +52,16 @@ export default function CreateTaskScreen({
   const [title, setTitle] =
     useState("");
 
-  const [description, setDescription] =
+  const [
+    description,
+    setDescription,
+  ] = useState("");
+
+  const [price, setPrice] =
     useState("");
 
-  const [reward, setReward] =
-    useState("");
+  const [category, setCategory] =
+    useState("Småjobber");
 
   const [image, setImage] =
     useState(null);
@@ -67,345 +69,229 @@ export default function CreateTaskScreen({
   const [loading, setLoading] =
     useState(false);
 
-  const [category, setCategory] =
-    useState("Annet");
+  const categories = [
 
-  const [urgent, setUrgent] =
-    useState(false);
+    "Flytting",
 
-  // IMAGE PICKER
+    "Transport",
+
+    "Småjobber",
+
+    "Rengjøring",
+
+    "IT",
+
+    "Barnepass",
+
+    "Hage",
+
+    "Bygg",
+
+    "Annet",
+  ];
+
+  // PICK IMAGE
 
   const pickImage =
     async () => {
 
       try {
 
-        const permission =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
-
-        if (
-          !permission.granted
-        ) {
-
-          Alert.alert(
-            "Gi tilgang til bilder"
-          );
-
-          return;
-        }
-
         const result =
-  await ImagePicker.launchImageLibraryAsync(
-    {
-      mediaTypes:
-        ["images"],
+          await ImagePicker.launchImageLibraryAsync({
 
-      allowsEditing:
-        true,
+            mediaTypes:
+              ImagePicker.MediaType.Images,
 
-      aspect: [4, 3],
+            allowsEditing:
+              true,
 
-      quality: 0.7,
-    }
-  );
+            quality: 0.7,
+          });
 
         if (
           !result.canceled
         ) {
 
           setImage(
-            result.assets[0].uri
+            result.assets[0]
+              .uri
           );
         }
 
       } catch (e) {
 
         console.log(e);
-
-        Alert.alert(
-          "Kunne ikke velge bilde"
-        );
-      }
-    };
-
-  // UPLOAD IMAGE
-
-  const uploadImage =
-    async (uri) => {
-
-      try {
-
-        const blob =
-  await new Promise(
-    (resolve, reject) => {
-
-      const xhr =
-        new XMLHttpRequest();
-
-      xhr.onload =
-        function () {
-
-          resolve(
-            xhr.response
-          );
-        };
-
-      xhr.onerror =
-        function () {
-
-          reject(
-            new TypeError(
-              "Network request failed"
-            )
-          );
-        };
-
-      xhr.responseType =
-        "blob";
-
-      xhr.open(
-        "GET",
-        uri,
-        true
-      );
-
-      xhr.send(null);
-    }
-  );
-
-        const filename =
-          `task_${Date.now()}`;
-
-        const storageRef =
-          ref(
-            storage,
-            `tasks/${filename}`
-          );
-
-        await uploadBytes(
-          storageRef,
-          blob
-        );
-
-        const downloadURL =
-          await getDownloadURL(
-            storageRef
-          );
-
-        return downloadURL;
-
-      } catch (e) {
-
-        console.log(
-          "UPLOAD ERROR:",
-          e
-        );
-
-        return "";
       }
     };
 
   // CREATE TASK
 
-const handleCreateTask =
-  async () => {
-
-    try {
+  const createTask =
+    async () => {
 
       if (
-        !title.trim()
-      ) {
-
-        return Alert.alert(
-          "Mangler tittel"
-        );
-      }
-
-      if (
-        !reward.trim()
-      ) {
-
-        return Alert.alert(
-          "Mangler belønning"
-        );
-      }
-
-      setLoading(true);
-
-      const rewardNumber =
-        Number(reward);
-
-      if (
-        isNaN(rewardNumber) ||
-
-        rewardNumber < 50 ||
-
-        rewardNumber > 50000
-      ) {
-
-        return Alert.alert(
-          "Belønning må være mellom 50 og 50000 kr"
-        );
-      }
-
-      let imageUrl = "";
-
-      if (image) {
-
-        imageUrl =
-          await uploadImage(
-            image
-          );
-      }
-
-      // LOCATION
-
-      const { status } =
-        await Location.requestForegroundPermissionsAsync();
-
-      if (
-        status !==
-        "granted"
+        !title ||
+        !description ||
+        !price
       ) {
 
         Alert.alert(
-          "Lokasjon kreves"
+          "Fyll ut alle felt 😄"
         );
-
-        setLoading(false);
 
         return;
       }
 
-      const location =
-        await Location.getCurrentPositionAsync(
+      try {
+
+        setLoading(true);
+
+        // LOCATION
+
+        const { status } =
+          await Location.requestForegroundPermissionsAsync();
+
+        if (
+          status !==
+          "granted"
+        ) {
+
+          Alert.alert(
+            "Lokasjon kreves"
+          );
+
+          return;
+        }
+
+        const location =
+          await Location.getCurrentPositionAsync(
+            {}
+          );
+
+        let imageUrl =
+          null;
+
+        // UPLOAD IMAGE
+
+        if (image) {
+
+          const response =
+            await fetch(
+              image
+            );
+
+          const blob =
+            await response.blob();
+
+          const filename =
+            `tasks/${Date.now()}`;
+
+          const storageRef =
+            ref(
+              storage,
+              filename
+            );
+
+          await uploadBytes(
+            storageRef,
+            blob
+          );
+
+          imageUrl =
+            await getDownloadURL(
+              storageRef
+            );
+        }
+
+        // SAVE TASK
+
+        await addDoc(
+          collection(
+            db,
+            "tasks"
+          ),
+
           {
-            accuracy:
-              Location.Accuracy.High,
+            title:
+              title.trim(),
+
+            description:
+              description.trim(),
+
+            price:
+              Number(price),
+
+            category,
+
+            image:
+              imageUrl,
+
+            latitude:
+              location.coords
+                .latitude,
+
+            longitude:
+              location.coords
+                .longitude,
+
+            ownerId:
+              auth.currentUser
+                ?.uid,
+
+            creatorName:
+
+              auth.currentUser
+                ?.displayName ||
+
+              "Bruker",
+
+            creatorEmail:
+
+              auth.currentUser
+                ?.email ||
+
+              "",
+
+            accepted:
+              false,
+
+            completed:
+              false,
+
+            createdAt:
+              serverTimestamp(),
           }
         );
 
-      const latitude =
-        Number(
-          location.coords.latitude
+        Alert.alert(
+          "Oppdrag opprettet 😮🔥"
         );
 
-      const longitude =
-        Number(
-          location.coords.longitude
+        navigation.goBack();
+
+      } catch (e) {
+
+        console.log(e);
+
+        Alert.alert(
+          "Noe gikk galt"
         );
 
-      // SAVE TASK
+      } finally {
 
-      await addDoc(
-        collection(
-          db,
-          "tasks"
-        ),
-
-        {
-          title:
-            title.trim(),
-
-          description:
-            description.trim(),
-
-          reward:
-            rewardNumber + " kr",
-
-          price:
-            rewardNumber,
-
-          urgent,
-
-          rating: 5,
-
-          image:
-            imageUrl,
-
-          latitude,
-
-          longitude,
-
-          category,
-
-          accepted: false,
-
-          completed: false,
-
-          trackingActive: false,
-
-          creatorName:
-            auth.currentUser
-              ?.displayName ||
-            "Bruker",
-
-          createdBy:
-            auth.currentUser?.uid,
-
-          ownerEmail:
-            auth.currentUser?.email,
-
-          status: "open",
-
-          createdAt:
-            Date.now(),
-        }
-      );
-
-      // RESET
-
-      setTitle("");
-      setDescription("");
-      setReward("");
-      setImage(null);
-      setCategory("Annet");
-      setUrgent(false);
-
-      Alert.alert(
-        "Oppdrag publisert 🔥"
-      );
-
-      navigation.navigate(
-        "Tabs",
-        {
-          screen: "Home",
-        }
-      );
-
-    } catch (e) {
-
-      console.log(
-        "CREATE TASK ERROR:",
-        e
-      );
-
-      Alert.alert(
-        "Firebase Error",
-        JSON.stringify(e)
-      );
-
-    } finally {
-
-      setLoading(false);
-    }
-};
+        setLoading(false);
+      }
+    };
 
   return (
 
     <ScrollView
-      style={{
-        flex: 1,
-
-        backgroundColor:
-          "#F4F6F8",
-      }}
+      style={
+        styles.container
+      }
 
       contentContainerStyle={{
-        padding: 20,
-
-        paddingTop: 60,
-
         paddingBottom: 140,
       }}
 
@@ -414,350 +300,574 @@ const handleCreateTask =
       }
     >
 
-      <Text
-        style={{
-          fontSize: 38,
+      {/* HERO */}
 
-          fontWeight: "bold",
+      <LinearGradient
+        colors={[
+          "#2563EB",
+          "#3B82F6",
+        ]}
 
-          color: "#111827",
-
-          marginBottom: 30,
-        }}
-      >
-        Opprett oppdrag
-      </Text>
-
-      {/* CATEGORY */}
-
-      <Text
-        style={{
-          fontSize: 18,
-
-          marginBottom: 14,
-
-          color: "#374151",
-        }}
-      >
-        Kategori
-      </Text>
-
-      <ScrollView
-        horizontal
-
-        showsHorizontalScrollIndicator={
-          false
+        style={
+          styles.hero
         }
-
-        style={{
-          marginBottom: 24,
-        }}
-      >
-
-        {categories.map(
-          (item) => (
-
-            <TouchableOpacity
-              key={item.value}
-
-              onPress={() =>
-                setCategory(
-                  item.value
-                )
-              }
-
-              style={{
-                backgroundColor:
-                  category ===
-                  item.value
-                    ? "#2563EB"
-                    : "#FFFFFF",
-
-                paddingHorizontal: 18,
-
-                paddingVertical: 14,
-
-                borderRadius: 20,
-
-                marginRight: 12,
-              }}
-            >
-
-              <Text
-                style={{
-                  color:
-                    category ===
-                    item.value
-                      ? "#FFFFFF"
-                      : "#111827",
-
-                  fontWeight: "700",
-                }}
-              >
-                {item.label}
-              </Text>
-
-            </TouchableOpacity>
-          )
-        )}
-
-      </ScrollView>
-
-      {/* TITLE */}
-
-      <TextInput
-        maxLength={40}
-
-        value={title}
-
-        onChangeText={setTitle}
-
-        placeholder="Hva trenger du hjelp til?"
-
-        placeholderTextColor="#9CA3AF"
-
-        style={{
-          backgroundColor:
-            "#FFFFFF",
-
-          padding: 22,
-
-          borderRadius: 24,
-
-          marginBottom: 20,
-
-          fontSize: 18,
-        }}
-      />
-
-      {/* DESCRIPTION */}
-
-      <TextInput
-        maxLength={180}
-
-        value={description}
-
-        onChangeText={setDescription}
-
-        placeholder="Beskriv oppdraget..."
-
-        placeholderTextColor="#9CA3AF"
-
-        multiline
-
-        style={{
-          backgroundColor:
-            "#FFFFFF",
-
-          padding: 22,
-
-          borderRadius: 24,
-
-          marginBottom: 20,
-
-          fontSize: 18,
-
-          height: 160,
-
-          textAlignVertical:
-            "top",
-        }}
-      />
-
-      {/* REWARD */}
-
-      <TextInput
-
-        maxLength={5}
-
-        value={reward}
-
-        onChangeText={setReward}
-
-        placeholder="Belønning i kr"
-
-        placeholderTextColor="#9CA3AF"
-
-        keyboardType="numeric"
-
-        style={{
-          backgroundColor:
-            "#FFFFFF",
-
-          padding: 22,
-
-          borderRadius: 24,
-
-          marginBottom: 20,
-
-          fontSize: 18,
-        }}
-      />
-
-      {/* URGENT */}
-
-      <View
-        style={{
-          backgroundColor:
-            "#FFFFFF",
-
-          padding: 22,
-
-          borderRadius: 24,
-
-          marginBottom: 20,
-
-          flexDirection: "row",
-
-          alignItems: "center",
-
-          justifyContent:
-            "space-between",
-        }}
-      >
-
-        <View>
-
-          <Text
-            style={{
-              fontSize: 18,
-
-              fontWeight: "700",
-
-              color: "#111827",
-            }}
-          >
-            Haster
-          </Text>
-
-          <Text
-            style={{
-              color: "#6B7280",
-
-              marginTop: 4,
-            }}
-          >
-            Vis oppdraget høyere
-          </Text>
-
-        </View>
-
-        <Switch
-          value={urgent}
-
-          onValueChange={
-            setUrgent
-          }
-        />
-
-      </View>
-
-      {/* IMAGE BUTTON */}
-
-      <TouchableOpacity
-        onPress={pickImage}
-
-        style={{
-          backgroundColor:
-            "#111827",
-
-          padding: 20,
-
-          borderRadius: 24,
-
-          alignItems: "center",
-
-          marginBottom: 20,
-        }}
       >
 
         <Text
-          style={{
-            color: "#FFFFFF",
-
-            fontSize: 17,
-
-            fontWeight: "700",
-          }}
+          style={
+            styles.heroTitle
+          }
         >
-          {image
-            ? "✓ Bilde valgt"
-            : "📷 Last opp bilde"}
+          Opprett oppdrag
         </Text>
 
-      </TouchableOpacity>
+        <Text
+          style={
+            styles.heroSubtitle
+          }
+        >
+          Finn hjelp i nærheten 😄
+        </Text>
 
-      {/* IMAGE */}
+      </LinearGradient>
 
-      {image && (
+      {/* CONTENT */}
 
-        <Image
-          source={{
-            uri: image,
-          }}
-
-          style={{
-            width: "100%",
-
-            height: 240,
-
-            borderRadius: 24,
-
-            marginBottom: 24,
-          }}
-
-          resizeMode="cover"
-        />
-      )}
-
-      {/* BUTTON */}
-
-      <TouchableOpacity
-        disabled={loading}
-
-        onPress={
-          handleCreateTask
+      <View
+        style={
+          styles.content
         }
-
-        style={{
-          backgroundColor:
-            loading
-              ? "#93C5FD"
-              : "#2563EB",
-
-          padding: 24,
-
-          borderRadius: 28,
-
-          alignItems: "center",
-
-          marginTop: 10,
-        }}
       >
 
-        {loading ? (
+        {/* IMAGE */}
 
-          <ActivityIndicator
-            color="white"
-          />
+        <TouchableOpacity
+          activeOpacity={0.9}
 
-        ) : (
+          style={
+            styles.imagePicker
+          }
+
+          onPress={
+            pickImage
+          }
+        >
+
+          {image ? (
+
+            <Image
+              source={{
+                uri:
+                  image,
+              }}
+
+              style={
+                styles.previewImage
+              }
+            />
+
+          ) : (
+
+            <View
+              style={
+                styles.imagePlaceholder
+              }
+            >
+
+              <Ionicons
+                name="image-outline"
+                size={40}
+                color="#9CA3AF"
+              />
+
+              <Text
+                style={
+                  styles.imageText
+                }
+              >
+                Legg til bilde
+              </Text>
+
+            </View>
+          )}
+
+        </TouchableOpacity>
+
+        {/* TITLE */}
+
+        <View
+          style={
+            styles.inputCard
+          }
+        >
 
           <Text
-            style={{
-              color: "#FFFFFF",
-
-              fontSize: 22,
-
-              fontWeight: "bold",
-            }}
+            style={
+              styles.label
+            }
           >
-            Publiser oppdrag
+            Tittel
           </Text>
-        )}
 
-      </TouchableOpacity>
+          <TextInput
+            value={title}
+
+            onChangeText={
+              setTitle
+            }
+
+            placeholder="Hva trenger du hjelp med?"
+
+            placeholderTextColor="#9CA3AF"
+
+            style={
+              styles.input
+            }
+          />
+
+        </View>
+
+        {/* DESCRIPTION */}
+
+        <View
+          style={
+            styles.inputCard
+          }
+        >
+
+          <Text
+            style={
+              styles.label
+            }
+          >
+            Beskrivelse
+          </Text>
+
+          <TextInput
+            value={
+              description
+            }
+
+            onChangeText={
+              setDescription
+            }
+
+            placeholder="Forklar oppdraget..."
+
+            placeholderTextColor="#9CA3AF"
+
+            multiline
+
+            style={
+              styles.textarea
+            }
+          />
+
+        </View>
+
+        {/* PRICE */}
+
+        <View
+          style={
+            styles.inputCard
+          }
+        >
+
+          <Text
+            style={
+              styles.label
+            }
+          >
+            Pris
+          </Text>
+
+          <TextInput
+            value={price}
+
+            onChangeText={
+              setPrice
+            }
+
+            placeholder="500"
+
+            placeholderTextColor="#9CA3AF"
+
+            keyboardType="numeric"
+
+            style={
+              styles.input
+            }
+          />
+
+        </View>
+
+        {/* CATEGORY */}
+
+        <Text
+          style={
+            styles.categoryTitle
+          }
+        >
+          Kategori
+        </Text>
+
+        <ScrollView
+          horizontal
+
+          showsHorizontalScrollIndicator={
+            false
+          }
+
+          style={{
+            marginBottom: 24,
+          }}
+        >
+
+          {categories.map(
+            (item) => (
+
+              <TouchableOpacity
+                key={item}
+
+                activeOpacity={0.9}
+
+                style={[
+                  styles.categoryButton,
+
+                  category ===
+                    item && {
+
+                    backgroundColor:
+                      "#2563EB",
+                  },
+                ]}
+
+                onPress={() =>
+                  setCategory(
+                    item
+                  )
+                }
+              >
+
+                <Text
+                  style={[
+                    styles.categoryText,
+
+                    category ===
+                      item && {
+
+                      color:
+                        "#FFFFFF",
+                    },
+                  ]}
+                >
+
+                  {item ===
+                    "Flytting" &&
+                    "🚚 "}
+
+                  {item ===
+                    "Transport" &&
+                    "🚗 "}
+
+                  {item ===
+                    "Småjobber" &&
+                    "⚡ "}
+
+                  {item ===
+                    "Rengjøring" &&
+                    "✨ "}
+
+                  {item ===
+                    "IT" &&
+                    "💻 "}
+
+                  {item ===
+                    "Barnepass" &&
+                    "👶 "}
+
+                  {item ===
+                    "Hage" &&
+                    "🌿 "}
+
+                  {item ===
+                    "Bygg" &&
+                    "🛠️ "}
+
+                  {item ===
+                    "Annet" &&
+                    "📦 "}
+
+                  {item}
+
+                </Text>
+
+              </TouchableOpacity>
+            )
+          )}
+
+        </ScrollView>
+
+        {/* BUTTON */}
+
+        <TouchableOpacity
+          activeOpacity={0.92}
+
+          style={
+            styles.button
+          }
+
+          disabled={loading}
+
+          onPress={
+            createTask
+          }
+        >
+
+          {loading ? (
+
+            <ActivityIndicator
+              color="#FFFFFF"
+            />
+
+          ) : (
+
+            <>
+              <Ionicons
+                name="flash"
+                size={20}
+                color="#FFFFFF"
+              />
+
+              <Text
+                style={
+                  styles.buttonText
+                }
+              >
+                Opprett oppdrag
+              </Text>
+            </>
+          )}
+
+        </TouchableOpacity>
+
+      </View>
 
     </ScrollView>
   );
 }
+
+const styles =
+  StyleSheet.create({
+
+    container: {
+
+      flex: 1,
+
+      backgroundColor:
+        "#F6F7FB",
+    },
+
+    hero: {
+
+      paddingTop:
+        Platform.OS ===
+        "android"
+
+          ? 70
+
+          : 90,
+
+      paddingBottom: 50,
+
+      paddingHorizontal: 24,
+
+      borderBottomLeftRadius: 34,
+
+      borderBottomRightRadius: 34,
+    },
+
+    heroTitle: {
+
+      fontSize: 34,
+
+      fontWeight: "800",
+
+      color:
+        "#FFFFFF",
+
+      marginBottom: 10,
+    },
+
+    heroSubtitle: {
+
+      fontSize: 16,
+
+      color:
+        "rgba(255,255,255,0.9)",
+    },
+
+    content: {
+
+      padding: 22,
+    },
+
+    imagePicker: {
+
+      height: 220,
+
+      borderRadius: 28,
+
+      backgroundColor:
+        "#FFFFFF",
+
+      marginBottom: 22,
+
+      overflow:
+        "hidden",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+    },
+
+    previewImage: {
+
+      width: "100%",
+
+      height: "100%",
+    },
+
+    imagePlaceholder: {
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+    },
+
+    imageText: {
+
+      marginTop: 10,
+
+      color:
+        "#6B7280",
+
+      fontWeight: "600",
+    },
+
+    inputCard: {
+
+      backgroundColor:
+        "#FFFFFF",
+
+      borderRadius: 24,
+
+      padding: 18,
+
+      marginBottom: 18,
+    },
+
+    label: {
+
+      fontSize: 14,
+
+      color:
+        "#6B7280",
+
+      marginBottom: 10,
+
+      fontWeight: "700",
+    },
+
+    input: {
+
+      fontSize: 16,
+
+      color:
+        "#111827",
+    },
+
+    textarea: {
+
+      minHeight: 120,
+
+      textAlignVertical:
+        "top",
+
+      fontSize: 16,
+
+      color:
+        "#111827",
+    },
+
+    categoryTitle: {
+
+      fontSize: 18,
+
+      fontWeight: "800",
+
+      color:
+        "#111827",
+
+      marginBottom: 14,
+    },
+
+    categoryButton: {
+
+      backgroundColor:
+        "#FFFFFF",
+
+      paddingHorizontal: 18,
+
+      paddingVertical: 12,
+
+      borderRadius: 999,
+
+      marginRight: 12,
+    },
+
+    categoryText: {
+
+      fontWeight: "700",
+
+      color:
+        "#111827",
+    },
+
+    button: {
+
+      backgroundColor:
+        "#2563EB",
+
+      height: 62,
+
+      borderRadius: 24,
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      flexDirection:
+        "row",
+
+      marginTop: 20,
+    },
+
+    buttonText: {
+
+      color:
+        "#FFFFFF",
+
+      fontSize: 17,
+
+      fontWeight: "800",
+
+      marginLeft: 10,
+    },
+  });

@@ -1,31 +1,23 @@
 import React, {
-  useContext,
   useEffect,
   useState,
   useRef,
-  useMemo,
 } from "react";
-
-import MapViewDirections
-from "react-native-maps-directions";
 
 import * as Location from "expo-location";
 
 import MapView, {
   Marker,
-  Circle,
-  AnimatedRegion,
 } from "react-native-maps";
 
 import {
   View,
-  Animated,
-  StyleSheet,
   Text,
+  StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  PanResponder,
+  Platform,
 } from "react-native";
 
 import {
@@ -33,387 +25,129 @@ import {
 } from "@expo/vector-icons";
 
 import {
-  TaskContext,
-} from "../context/TaskContext";
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+} from "firebase/firestore";
+
+import {
+  db,
+} from "../firebaseConfig";
 
 export default function MapScreen({
   navigation,
 }) {
-  const { tasks } =
-    useContext(TaskContext);
-    console.log(
-  "TASKS:",
-  JSON.stringify(
-    tasks,
-    null,
-    2
-  )
-);
+
+  const [tasks, setTasks] =
+    useState([]);
 
   const [loading, setLoading] =
-    useState(false);
+    useState(true);
 
-  const [selectedTask, setSelectedTask] =
-    useState(null);
+  const [
+    selectedTask,
+    setSelectedTask,
+  ] = useState(null);
 
-  const [userLocation, setUserLocation] =
-    useState(null);
+  const [
+    userLocation,
+    setUserLocation,
+  ] = useState(null);
 
-  const [selectedCategory, setSelectedCategory] =
-    useState("Alle");
+  const [
+    selectedCategory,
+    setSelectedCategory,
+  ] = useState("Alle");
 
-  const mapRef = useRef(null);
-
-  const slideAnim =
-  useRef(
-    new Animated.Value(
-      300
-    )
-  ).current;
-
-  const SNAP_TOP = 40;
-
-  const SNAP_MIDDLE = 70;
-
-  const SNAP_BOTTOM = 900;
-
-  const panResponder =
-  useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder:
-        (_, gesture) =>
-          gesture.dy > 8,
-
-      onPanResponderMove:
-        (_, gesture) => {
-
-          if (
-            gesture.dy > 0
-          ) {
-
-            slideAnim.setValue(
-              gesture.dy
-            );
-          }
-        },
-
-      onPanResponderRelease:
-  (_, gesture) => {
-
-    if (
-      gesture.dy > 180
-    ) {
-
-      Animated.spring(
-        slideAnim,
-        {
-          toValue:
-            SNAP_BOTTOM,
-
-          useNativeDriver:
-            true,
-        }
-      ).start(() => {
-        setSelectedTask(
-          null
-        );
-      });
-
-    } else if (
-      gesture.dy < -80
-    ) {
-
-      Animated.spring(
-        slideAnim,
-        {
-          toValue:
-            SNAP_TOP,
-
-          useNativeDriver:
-            true,
-        }
-      ).start();
-
-    } else {
-
-      Animated.spring(
-        slideAnim,
-        {
-          toValue:
-            SNAP_MIDDLE,
-
-          useNativeDriver:
-            true,
-        }
-      ).start();
-    }
-  },
-    })
-  ).current;
-
-  const helperCoordinate =
-  useRef(
-    new AnimatedRegion({
-      latitude:
-        69.9642,
-
-      longitude:
-        23.3171,
-
-      latitudeDelta:
-        0.01,
-
-      longitudeDelta:
-        0.01,
-    })
-  ).current;
+  const mapRef =
+    useRef(null);
 
   const categories = [
-  "Alle",
-  "Flytting",
-  "Rengjøring",
-  "IT",
-  "Levering",
-  "Hage",
-  "Bæring",
-  "Dyrepass",
-  "Annet",
-];
 
-  const calculateDistance = (
-    lat1,
-    lon1,
-    lat2,
-    lon2
-  ) => {
-    const toRad = (
-      value
-    ) =>
-      (value * Math.PI) /
-      180;
+    "Alle",
 
-    const R = 6371;
+    "Flytting",
 
-    const dLat = toRad(
-      lat2 - lat1
-    );
+    "Transport",
 
-    const dLon = toRad(
-      lon2 - lon1
-    );
+    "Småjobber",
 
-    const a =
-      Math.sin(dLat / 2) *
-        Math.sin(
-          dLat / 2
-        ) +
-      Math.cos(
-        toRad(lat1)
-      ) *
-        Math.cos(
-          toRad(lat2)
-        ) *
-        Math.sin(dLon / 2) *
-        Math.sin(
-          dLon / 2
-        );
+    "Rengjøring",
 
-    const c =
-      2 *
-      Math.atan2(
-        Math.sqrt(a),
-        Math.sqrt(
-          1 - a
-        )
-      );
+    "IT",
 
-    return (
-      R * c
-    ).toFixed(1);
-  };
+    "Barnepass",
 
-  const getTimeAgo = (
-  createdAt
-) => {
+    "Hage",
 
-  if (!createdAt)
-    return "Nå";
+    "Bygg",
 
-  const date =
-    createdAt?.seconds
-      ? new Date(
-          createdAt.seconds *
-            1000
-        )
-      : new Date(
-          createdAt
-        );
+    "Annet",
+  ];
 
-  const diff =
-    Date.now() -
-    date.getTime();
-
-  const minutes =
-    Math.floor(
-      diff / 60000
-    );
-
-  const hours =
-    Math.floor(
-      minutes / 60
-    );
-
-  const days =
-    Math.floor(
-      hours / 24
-    );
-
-  if (minutes < 1)
-    return "Nå";
-
-  if (minutes < 60)
-    return `${minutes} min`;
-
-  if (hours < 24)
-    return `${hours} t`;
-
-  return `${days} d`;
-};
+  // LOAD
 
   useEffect(() => {
 
-  if (
-    selectedTask?.helperLatitude &&
-    selectedTask?.helperLongitude
-  ) {
+    loadLocation();
 
-    helperCoordinate.timing({
-      latitude:
-        selectedTask.helperLatitude,
+    const q = query(
+      collection(db, "tasks"),
+      orderBy("createdAt", "desc")
+    );
 
-      longitude:
-        selectedTask.helperLongitude,
+    const unsubscribe =
+      onSnapshot(
+        q,
 
-      duration: 1200,
+        (snapshot) => {
 
-      useNativeDriver:
-        false,
-    }).start();
-  }
+          const taskList =
+            [];
 
-}, [
-  selectedTask?.helperLatitude,
-  selectedTask?.helperLongitude,
-]);
+          snapshot.forEach(
+            (doc) => {
 
-  useEffect(() => {
-    const loadMap =
-      async () => {
-        try {
-          const { status } =
-            await Location.requestForegroundPermissionsAsync();
+              taskList.push({
+                id:
+                  doc.id,
 
-          if (
-            status !==
-            "granted"
-          ) {
-            setLoading(false);
-            return;
-          }
-
-          const location =
-            await Location.getCurrentPositionAsync(
-              {}
-            );
-
-          setUserLocation(
-            location.coords
+                ...doc.data(),
+              });
+            }
           );
 
-          mapRef.current?.animateToRegion(
-            {
-              latitude:
-                location.coords
-                  .latitude,
+          setTasks(taskList);
 
-              longitude:
-                location.coords
-                  .longitude,
-
-              latitudeDelta:
-                0.012,
-
-              longitudeDelta:
-                0.012,
-            },
-            1000
-          );
-        } catch (e) {
-          console.log(e);
-        } finally {
           setLoading(false);
         }
-      };
+      );
 
-    loadMap();
+    return unsubscribe;
+
   }, []);
 
-  const activeTasks =
-  useMemo(() => {
+  // LOCATION
 
-    console.log(
-      "RAW TASKS:",
-      tasks
-    );
-
-    return (
-      tasks?.filter(
-        (task) => {
-
-          console.log(
-            "TASK:",
-            task
-          );
-
-          const category =
-            task.category ||
-            "Annet";
-
-          const hasCoords =
-            task?.latitude != null &&
-            task?.longitude != null;
-
-          console.log(
-            "HAS COORDS:",
-            hasCoords,
-            task?.latitude,
-            task?.longitude
-          );
-
-          return (
-            (selectedCategory ===
-              "Alle" ||
-              category ===
-                selectedCategory) &&
-
-            !task?.completed &&
-
-            task?.status !==
-              "completed" &&
-
-            hasCoords
-          );
-        }
-      ) || []
-    );
-  }, [
-    tasks,
-    selectedCategory,
-  ]);
-
-  const focusLocation =
+  const loadLocation =
     async () => {
+
       try {
+
+        const { status } =
+          await Location.requestForegroundPermissionsAsync();
+
+        if (
+          status !==
+          "granted"
+        ) {
+
+          setLoading(false);
+
+          return;
+        }
+
         const location =
           await Location.getCurrentPositionAsync(
             {}
@@ -423,247 +157,247 @@ export default function MapScreen({
           location.coords
         );
 
-        mapRef.current?.animateToRegion(
-          {
-            latitude:
-              location.coords
-                .latitude,
-
-            longitude:
-              location.coords
-                .longitude,
-
-            latitudeDelta:
-              0.05,
-
-            longitudeDelta:
-              0.05,
-          },
-          1000
-        );
       } catch (e) {
+
         console.log(e);
+
+      } finally {
+
+        setLoading(false);
       }
     };
 
-  const distance =
-    selectedTask &&
-    userLocation
-      ? calculateDistance(
-          userLocation.latitude,
-          userLocation.longitude,
-          selectedTask.latitude,
-          selectedTask.longitude
-        )
-      : null;
-  const eta =
-  distance
-    ? Math.ceil(
-        distance * 2.2
-      )
-    : null;
+  // CATEGORY COLORS
 
-      useEffect(() => {
+  const getCategoryColor =
+    (category) => {
 
-  if (
-    userLocation &&
-    selectedTask
-  ) {
+      switch (
+        category
+      ) {
 
-    mapRef.current?.fitToCoordinates(
-      [
-        {
-          latitude:
-            userLocation.latitude,
+        case "Flytting":
+          return "#22C55E";
 
-          longitude:
-            userLocation.longitude,
-        },
+        case "Transport":
+          return "#0EA5E9";
 
-        {
-          latitude:
-            selectedTask.latitude,
+        case "Småjobber":
+          return "#F59E0B";
 
-          longitude:
-            selectedTask.longitude,
-        },
-      ],
+        case "Rengjøring":
+          return "#8B5CF6";
 
-      {
-        edgePadding: {
-          top: 220,
+        case "IT":
+          return "#2563EB";
 
-          right: 80,
+        case "Barnepass":
+          return "#EC4899";
 
-          bottom: 320,
+        case "Hage":
+          return "#16A34A";
 
-          left: 80,
-        },
+        case "Bygg":
+          return "#EA580C";
 
-        animated: true,
+        case "Annet":
+          return "#6B7280";
+
+        default:
+          return "#6B7280";
       }
+    };
+
+  // CATEGORY ICONS
+
+  const getCategoryIcon =
+    (category) => {
+
+      switch (
+        category
+      ) {
+
+        case "Flytting":
+          return "home";
+
+        case "Transport":
+          return "car";
+
+        case "Småjobber":
+          return "flash";
+
+        case "Rengjøring":
+          return "sparkles";
+
+        case "IT":
+          return "desktop";
+
+        case "Barnepass":
+          return "happy";
+
+        case "Hage":
+          return "leaf";
+
+        case "Bygg":
+          return "hammer";
+
+        case "Annet":
+          return "apps";
+
+        default:
+          return "apps";
+      }
+    };
+
+  // FILTER
+
+  const filteredTasks =
+    tasks.filter(
+      (task) =>
+
+        selectedCategory ===
+          "Alle"
+
+          ? true
+
+          : task.category ===
+            selectedCategory
     );
-  }
 
-}, [
-  selectedTask,
-]);
+  // DISTANCE
 
-      useEffect(() => {
-  Animated.timing(
-    slideAnim,
-    {
-      toValue:
-      selectedTask
-        ? SNAP_MIDDLE
-        : SNAP_BOTTOM,
+  const calculateDistance =
+    (
+      lat1,
+      lon1,
+      lat2,
+      lon2
+    ) => {
 
-      duration: 260,
+      if (
+        !lat1 ||
+        !lon1 ||
+        !lat2 ||
+        !lon2
+      ) {
 
-      useNativeDriver:
-        true,
-    }
-  ).start();
-}, [selectedTask]);
+        return 0;
+      }
 
-  const mapStyle = [
-  {
-    featureType: "poi",
-    stylers: [
-      {
-        visibility: "off",
-      },
-    ],
-  },
+      const R = 6371;
 
-  {
-    featureType: "transit",
-    stylers: [
-      {
-        visibility: "off",
-      },
-    ],
-  },
+      const dLat =
+        ((lat2 - lat1) *
+          Math.PI) /
+        180;
 
-  {
-    featureType: "road",
-    elementType: "geometry",
-    stylers: [
-      {
-        saturation: -15,
-      },
-    ],
-  },
-];
+      const dLon =
+        ((lon2 - lon1) *
+          Math.PI) /
+        180;
+
+      const a =
+        Math.sin(dLat / 2) *
+          Math.sin(dLat / 2) +
+
+        Math.cos(
+          (lat1 *
+            Math.PI) /
+            180
+        ) *
+
+          Math.cos(
+            (lat2 *
+              Math.PI) /
+              180
+          ) *
+
+          Math.sin(
+            dLon / 2
+          ) *
+
+          Math.sin(
+            dLon / 2
+          );
+
+      const c =
+        2 *
+        Math.atan2(
+          Math.sqrt(a),
+          Math.sqrt(
+            1 - a
+          )
+        );
+
+      return Math.round(
+        R * c
+      );
+    };
 
   return (
-    <View style={styles.container}>
-      {loading && (
+
+    <View
+      style={
+        styles.container
+      }
+    >
+
+      {loading ? (
+
         <View
           style={
             styles.loadingContainer
           }
         >
+
           <ActivityIndicator
             size="large"
-            color="#2563EB"
+            color="#22C55E"
           />
+
         </View>
-      )}
 
-      <MapView
-    customMapStyle={mapStyle}
+      ) : (
 
-  style={{
-    flex: 1,
-  }}
+        <MapView
+          ref={mapRef}
 
-  ref={mapRef}
+          style={
+            styles.map
+          }
 
-  initialRegion={{
-    latitude: 69.9642,
-    longitude: 23.3171,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
-  }}
+          showsUserLocation
 
-  showsUserLocation={true}
+          showsMyLocationButton={
+            false
+          }
 
-  showsMyLocationButton={false}
->
+          initialRegion={{
+            latitude:
+              userLocation
+                ?.latitude ||
+              69.6492,
 
-  {/* ROUTE */}
+            longitude:
+              userLocation
+                ?.longitude ||
+              18.9553,
 
-  {
-    userLocation &&
-    selectedTask && (
+            latitudeDelta:
+              0.08,
 
-      <MapViewDirections
-        zIndex={-1}
-        origin={{
-          latitude:
-            userLocation.latitude,
-
-          longitude:
-            userLocation.longitude,
-        }}
-
-        destination={{
-          latitude:
-            selectedTask.latitude,
-
-          longitude:
-            selectedTask.longitude,
-        }}
-
-        resetOnChange={false}
-
-        mode="DRIVING"
-
-        apikey="AIzaSyB9WovNfpDfF_lCSGR2-her8uhmhWutP54"
-
-        strokeWidth={5}
-
-        strokeColor="#2563EB"
-      />
-    )
-  }
-
-  {/* TASKS */}
-
-  {activeTasks.map(
-    (task) => {
-
-      return (
-
-        <React.Fragment
-          key={task.id}
+            longitudeDelta:
+              0.08,
+          }}
         >
 
-          {/* TASK PIN */}
+          {filteredTasks.map(
+            (task) => (
 
-          <Marker
-            tracksViewChanges={false}
-            coordinate={{
-              latitude:
-                Number(
-                  task.latitude
-                ),
+              <Marker
+                key={task.id}
 
-              longitude:
-                Number(
-                  task.longitude
-                ),
-            }}
-
-            onPress={() => {
-
-              setSelectedTask(
-                task
-              );
-
-              mapRef.current?.animateToRegion(
-                {
+                coordinate={{
                   latitude:
                     Number(
                       task.latitude
@@ -673,284 +407,264 @@ export default function MapScreen({
                     Number(
                       task.longitude
                     ),
-
-                  latitudeDelta:
-                    0.015,
-
-                  longitudeDelta:
-                    0.015,
-                },
-
-                500
-              );
-            }}
-          />
-
-          {/* HELPER */}
-
-          {
-            task.helperLatitude &&
-            task.helperLongitude && (
-
-              <Marker
-              tracksViewChanges={false}
-
-                coordinate={{
-                  latitude:
-                    Number(
-                      task.helperLatitude
-                    ),
-
-                  longitude:
-                    Number(
-                      task.helperLongitude
-                    ),
                 }}
+
+                onPress={() =>
+                  setSelectedTask(
+                    task
+                  )
+                }
               >
 
                 <View
-                  style={{
-                    width: 22,
-                    height: 22,
+                  style={[
+                    styles.marker,
 
-                    borderRadius: 11,
+                    {
+                      backgroundColor:
+                        getCategoryColor(
+                          task.category
+                        ),
+                    },
+                  ]}
+                >
 
-                    backgroundColor:
-                      "#22C55E",
+                  <Ionicons
+                    name={getCategoryIcon(
+                      task.category
+                    )}
 
-                    borderWidth: 4,
+                    size={17}
 
-                    borderColor:
-                      "white",
+                    color="#FFFFFF"
+                  />
 
-                    shadowColor:
-                      "#000",
-
-                    shadowOpacity: 0.25,
-
-                    shadowRadius: 8,
-
-                    elevation: 8,
-                  }}
-                />
+                </View>
 
               </Marker>
             )
-          }
+          )}
 
-        </React.Fragment>
-      );
-    }
-  )}
+        </MapView>
+      )}
 
-</MapView>
+      {/* TOP */}
 
       <View
         style={
-          styles.topCard
+          styles.topContainer
         }
       >
-        <Text
-          style={
-            styles.title
-          }
-        >
-          Oppdrag nær deg
-        </Text>
 
-        <Text
+        <View
           style={
-            styles.subtitle
+            styles.searchCard
           }
         >
-          {
-            activeTasks.length
-          }{" "}
-          aktive oppdrag
-        </Text>
+
+          <Ionicons
+            name="map-outline"
+            size={18}
+            color="#111827"
+          />
+
+          <Text
+            style={
+              styles.searchText
+            }
+          >
+            Oppdrag i området
+          </Text>
+
+        </View>
+
+        <TouchableOpacity
+          style={
+            styles.filterButton
+          }
+        >
+
+          <Ionicons
+            name="options-outline"
+            size={22}
+            color="#111827"
+          />
+
+        </TouchableOpacity>
+
       </View>
 
-      <View
-      {...panResponder.panHandlers}
-  style={{
-    opacity:
-      selectedTask
-        ? 0.35
-        : 1,
-  }}
->
+      {/* FILTERS */}
+
       <ScrollView
         horizontal
+
         showsHorizontalScrollIndicator={
           false
         }
+
         style={
-          styles.filterContainer
+          styles.filterScroll
         }
       >
+
         {categories.map(
           (category) => (
+
             <TouchableOpacity
               key={category}
+
+              activeOpacity={0.9}
+
               onPress={() =>
                 setSelectedCategory(
                   category
                 )
               }
+
               style={[
-                styles.filterChip,
+                styles.categoryChip,
 
                 selectedCategory ===
                   category && {
+
                   backgroundColor:
-                    "#2563EB",
+                    "#111827",
                 },
               ]}
             >
+
               <Text
                 style={[
-                  styles.filterText,
+                  styles.categoryText,
 
                   selectedCategory ===
                     category && {
+
                     color:
-                      "white",
+                      "#FFFFFF",
                   },
                 ]}
               >
+
+                {category ===
+                  "Alle" &&
+                  "⚡ "}
+
+                {category ===
+                  "Flytting" &&
+                  "🚚 "}
+
+                {category ===
+                  "Transport" &&
+                  "🚗 "}
+
+                {category ===
+                  "Småjobber" &&
+                  "⚡ "}
+
+                {category ===
+                  "IT" &&
+                  "💻 "}
+
+                {category ===
+                  "Rengjøring" &&
+                  "✨ "}
+
+                {category ===
+                  "Barnepass" &&
+                  "👶 "}
+
+                {category ===
+                  "Hage" &&
+                  "🌿 "}
+
+                {category ===
+                  "Bygg" &&
+                  "🛠️ "}
+
+                {category ===
+                  "Annet" &&
+                  "📦 "}
+
                 {category}
+
               </Text>
+
             </TouchableOpacity>
           )
         )}
+
       </ScrollView>
-      </View>
 
-        <View
-  style={{
-    opacity:
-      selectedTask
-        ? 0.35
-        : 1,
-  }}
->
+      {/* LOCATION */}
 
-  {/* LOCATION BUTTON */}
+      <TouchableOpacity
+        style={
+          styles.locationButton
+        }
 
-  <TouchableOpacity
-    style={
-      styles.locationButton
-    }
-    onPress={
-      focusLocation
-    }
-  >
-    <Ionicons
-      name="locate"
-      size={26}
-      color="white"
-    />
-  </TouchableOpacity>
+        onPress={
+          loadLocation
+        }
+      >
 
-  {/* FAB BUTTON */}
+        <Ionicons
+          name="locate"
+          size={22}
+          color="#FFFFFF"
+        />
 
-  <TouchableOpacity
-    style={
-      styles.fabButton
-    }
-    onPress={() =>
-      navigation.navigate(
-        "CreateTask"
-      )
-    }
-  >
-    <Ionicons
-      name="add"
-      size={34}
-      color="white"
-    />
-  </TouchableOpacity>
+      </TouchableOpacity>
 
-</View>
-
-        {selectedTask && (
-  <Animated.View
-    pointerEvents="none"
-    style={{
-      position:
-        "absolute",
-
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-
-      backgroundColor:
-        "black",
-
-      opacity: 0.08,
-
-      zIndex: 5,
-    }}
-  />
-)}
+      {/* BOTTOM CARD */}
 
       {selectedTask && (
-        <Animated.View
-        pointerEvents="box-none"
-  style={[
-    styles.bottomCard,
-    {
-      transform: [
-        {
-          translateY:
-            slideAnim,
-        },
-      ],
-    },
-  ]}
->
 
-  <TouchableOpacity
-    style={
-      styles.closeButton
-    }
-    onPress={() =>
-      setSelectedTask(
-        null
-      )
-    }
-  >
-    <Ionicons
-      name="close"
-      size={24}
-      color="#111827"
-    />
-  </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.92}
+        <TouchableOpacity
+          activeOpacity={0.95}
+
+          style={
+            styles.bottomCard
+          }
+
+          onPress={() =>
+
+            navigation.navigate(
+              "TaskDetail",
+
+              {
+                taskId:
+                  selectedTask.id,
+              }
+            )
+          }
+        >
+
+          <View
             style={
-              styles.sheetContent
+              styles.dragHandle
             }
-            onPress={() =>
-              navigation.navigate(
-                "TaskDetail",
-                {
-                  task:
-                    selectedTask,
-                }
-              )
+          />
+
+          <View
+            style={
+              styles.cardTop
             }
           >
+
             <View
-              style={
-                styles.bottomTop
-              }
+              style={{
+                flex: 1,
+              }}
             >
+
               <Text
                 style={
-                  styles.bottomTitle
+                  styles.taskTitle
                 }
+
+                numberOfLines={1}
               >
                 {
                   selectedTask.title
@@ -959,127 +673,99 @@ export default function MapScreen({
 
               <Text
                 style={
-                  styles.price
+                  styles.taskDescription
                 }
+
+                numberOfLines={2}
               >
                 {
-                  selectedTask.reward
+                  selectedTask.description
                 }
               </Text>
+
             </View>
 
             <Text
               style={
-                styles.description
+                styles.price
               }
-              numberOfLines={3}
             >
               {
-                selectedTask.description
+                selectedTask.price
+              } kr
+            </Text>
+
+          </View>
+
+          <View
+            style={
+              styles.metaRow
+            }
+          >
+
+            <Text
+              style={
+                styles.meta
               }
+            >
+              📍 {
+                calculateDistance(
+                  userLocation?.latitude,
+                  userLocation?.longitude,
+                  selectedTask.latitude,
+                  selectedTask.longitude
+                )
+              } km unna
             </Text>
 
             <View
-              style={
-                styles.metaRow
-              }
+              style={[
+                styles.categoryBadge,
+
+                {
+                  backgroundColor:
+                    getCategoryColor(
+                      selectedTask.category
+                    ),
+                },
+              ]}
             >
-              <Text
-                style={
-                  styles.metaText
-                }
-              >
-                {"⭐".repeat(
-                  Math.round(
-                  selectedTask?.creatorRating
-                    || 5
-                  )
-                )}
-
-                {" "}
-                (
-                  {selectedTask?.creatorRating
-                    || 5}
-                )
-              </Text>
 
               <Text
                 style={
-                styles.metaText
+                  styles.categoryBadgeText
                 }
               >
-              🕒 {
-                  getTimeAgo(
-                  selectedTask.createdAt
-                  )
-                  }
+                {
+                  selectedTask.category
+                }
               </Text>
 
-              <Text
-                style={
-                  styles.metaText
-                }
-              >
-                📍{" "}
-                {distance} km
-              </Text>
-                <Text
-                style={
-                styles.metaText
-                }
-            >
-              🚗 {eta} min unna
-            </Text>
             </View>
 
-            <TouchableOpacity
-              style={
-              styles.openButton
-                    }
-              onPress={() =>
-                navigation.navigate(
-                "TaskDetail",
-              {
-                task:
-                  selectedTask,
-              }
-                )
-              }
-            >
-              <Text
-                style={
-                  styles.openButtonText
-                }
-              >
-                Åpne oppdrag
-              </Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </Animated.View>
+          </View>
+
+        </TouchableOpacity>
       )}
+
     </View>
   );
 }
 
 const styles =
   StyleSheet.create({
+
     container: {
       flex: 1,
     },
 
     map: {
-      width: "100%",
-      height: "100%",
+      flex: 1,
     },
 
     loadingContainer: {
-      position:
-        "absolute",
 
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
+      flex: 1,
 
       justifyContent:
         "center",
@@ -1088,114 +774,147 @@ const styles =
         "center",
 
       backgroundColor:
-        "#F3F4F6",
-
-      zIndex: 999,
+        "#F5F7FA",
     },
 
-    topCard: {
+    topContainer: {
+
       position:
         "absolute",
 
-      borderWidth: 1,
+      top:
+        Platform.OS ===
+        "android"
 
-      borderColor:
-      "rgba(255,255,255,0.7)",
+          ? 58
 
-      top: 62,
+          : 68,
 
-      left: 18,
+      left: 20,
 
-      right: 18,
+      right: 20,
+
+      flexDirection:
+        "row",
+    },
+
+    searchCard: {
+
+      flex: 1,
 
       backgroundColor:
-        "rgba(255,255,255,0.88)",
+        "rgba(255,255,255,0.96)",
 
-      padding: 22,
+      borderRadius: 22,
 
-      borderRadius: 28,
+      paddingHorizontal: 18,
+
+      paddingVertical: 16,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
 
       shadowColor:
         "#000",
 
       shadowOpacity: 0.08,
 
-      shadowRadius: 14,
+      shadowRadius: 12,
 
-      elevation: 8,
+      elevation: 4,
     },
 
-    title: {
-      fontSize: 30,
+    searchText: {
 
-      fontWeight:
-        "bold",
+      marginLeft: 10,
+
+      fontSize: 15,
+
+      fontWeight: "700",
 
       color:
         "#111827",
     },
 
-    subtitle: {
-      marginTop: 6,
+    filterButton: {
 
-      fontSize: 18,
+      width: 56,
 
-      color:
-        "#6B7280",
+      height: 56,
+
+      borderRadius: 20,
+
+      backgroundColor:
+        "rgba(255,255,255,0.96)",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      marginLeft: 12,
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.08,
+
+      shadowRadius: 12,
+
+      elevation: 4,
     },
 
-    filterContainer: {
+    filterScroll: {
+
       position:
         "absolute",
 
-      top: 190,
+      top:
+        Platform.OS ===
+        "android"
 
-      paddingLeft: 18,
+          ? 135
+
+          : 145,
+
+      paddingLeft: 20,
     },
 
-    filterChip: {
+    categoryChip: {
+
       backgroundColor:
-        "rgba(255,255,255,0.96)",
+        "rgba(255,255,255,0.95)",
 
       paddingHorizontal: 18,
 
       paddingVertical: 12,
 
-      borderRadius: 20,
+      borderRadius: 999,
 
-      marginRight: 12,
-
-      shadowColor: "#000",
-
-      shadowOpacity: 0.08,
-
-      shadowRadius: 8,
-
-      elevation: 4,
+      marginRight: 10,
     },
 
-    filterText: {
+    categoryText: {
+
+      fontSize: 14,
+
       fontWeight: "700",
 
-      color: "#111827",
+      color:
+        "#111827",
     },
 
-    locationButton: {
-      position:
-        "absolute",
+    marker: {
 
-      right: 20,
+      width: 42,
 
-      bottom: 150,
+      height: 42,
 
-      width: 72,
-
-      height: 72,
-
-      borderRadius: 36,
-
-      backgroundColor:
-        "#0B1437",
+      borderRadius: 21,
 
       justifyContent:
         "center",
@@ -1206,74 +925,153 @@ const styles =
       shadowColor:
         "#000",
 
-      shadowOpacity: 0.22,
+      shadowOpacity: 0.24,
 
       shadowRadius: 12,
+
+      elevation: 6,
+
+      borderWidth: 3,
+
+      borderColor:
+        "#FFFFFF",
+    },
+
+    locationButton: {
+
+      position:
+        "absolute",
+
+      right: 20,
+
+      bottom: 190,
+
+      width: 60,
+
+      height: 60,
+
+      borderRadius: 30,
+
+      backgroundColor:
+        "#111827",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.2,
+
+      shadowRadius: 12,
+
+      elevation: 8,
+    },
+
+    bottomCard: {
+
+      position:
+        "absolute",
+
+      left: 20,
+
+      right: 20,
+
+      bottom: 108,
+
+      backgroundColor:
+        "rgba(255,255,255,0.98)",
+
+      borderRadius: 32,
+
+      paddingHorizontal: 22,
+
+      paddingTop: 12,
+
+      paddingBottom: 20,
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.12,
+
+      shadowRadius: 18,
 
       elevation: 10,
     },
 
-    bottomCard: {
-  position: "absolute",
+    dragHandle: {
 
-  overflow: "hidden",
+      width: 42,
 
-  borderWidth: 1,
+      height: 5,
 
-  borderColor:
-    "rgba(255,255,255,0.65)",
+      borderRadius: 999,
 
-  left: 18,
+      backgroundColor:
+        "#D1D5DB",
 
-  right: 18,
+      alignSelf:
+        "center",
 
-  bottom: 140,
+      marginBottom: 16,
+    },
 
-  backgroundColor:
-    "rgba(255,255,255,0.96)",
+    cardTop: {
 
-  borderRadius: 34,
+      flexDirection:
+        "row",
 
-  padding: 24,
+      justifyContent:
+        "space-between",
 
-  paddingBottom: 34,
+      alignItems:
+        "flex-start",
 
-  shadowColor:
-    "#000",
+      marginBottom: 12,
+    },
 
-  shadowOpacity: 0.14,
+    taskTitle: {
 
-  shadowRadius: 18,
+      fontSize: 19,
 
-  elevation: 12,
-},
+      fontWeight: "800",
 
-    closeButton: {
-  position: "absolute",
+      color:
+        "#111827",
 
-  top: 18,
+      marginBottom: 6,
+    },
 
-  right: 18,
+    taskDescription: {
 
-  zIndex: 999,
+      fontSize: 14,
 
-  width: 36,
+      color:
+        "#6B7280",
 
-  height: 36,
+      lineHeight: 21,
 
-  borderRadius: 18,
+      paddingRight: 12,
+    },
 
-  backgroundColor:
-    "#F3F4F6",
+    price: {
 
-  justifyContent:
-    "center",
+      fontSize: 22,
 
-  alignItems:
-    "center",
-},
+      fontWeight: "800",
 
-    bottomTop: {
+      color:
+        "#22C55E",
+
+      marginLeft: 14,
+    },
+
+    metaRow: {
+
       flexDirection:
         "row",
 
@@ -1284,149 +1082,32 @@ const styles =
         "center",
     },
 
-    bottomTitle: {
-        fontSize: 28,
+    meta: {
 
-        fontWeight: "bold",
-
-        color: "#111827",
-
-        flex: 1,
-
-        maxWidth: "68%",
-
-        lineHeight: 34,
-    },
-
-    price: {
-      fontSize: 38,
-
-      fontWeight: "900",
-
-      color: "#4ADE80",
-
-      marginLeft: 16,
-
-    },
-
-    description: {
-      marginTop: 12,
-
-      fontSize: 17,
-
-      color:
-        "#6B7280",
-
-      lineHeight: 24,
-
-      backgroundColor:"white",
-
-      borderRadius: 26,
-
-      padding: 26,
-
-      shadowOpacity: 0.06,
-
-      shadowColor: "#000",
-
-      shadowRadius: 10,
-
-      elevation: 4,
-    },
-
-    metaRow: {
-      flexDirection:
-        "row",
-
-      flexWrap: "wrap",
-
-      gap: 10,
-
-      justifyContent:
-        "space-between",
-
-      marginTop: 18,
-    },
-
-    metaText: {
       fontSize: 14,
 
-      marginRight: 10,
-
-      marginBottom: 8,
-
-      fontWeight:
-        "700",
-
       color:
         "#6B7280",
+
+      fontWeight: "600",
     },
 
-    sheetContent: {
-      flex: 1,
+    categoryBadge: {
+
+      paddingHorizontal: 12,
+
+      paddingVertical: 8,
+
+      borderRadius: 999,
     },
 
-    openButton: {
-  marginTop: 24,
+    categoryBadgeText: {
 
-  backgroundColor:
-    "#2563EB",
+      color:
+        "#FFFFFF",
 
-  paddingVertical: 18,
+      fontSize: 12,
 
-  borderRadius: 18,
-
-  alignItems:
-    "center",
-
-  shadowColor:
-    "#2563EB",
-
-  shadowOpacity: 0.28,
-
-  shadowRadius: 12,
-
-  elevation: 8,
-},
-
-    openButtonText: {
-      color: "white",
-
-      fontWeight: "bold",
-
-      fontSize: 17,
+      fontWeight: "700",
     },
-
-fabButton: {
-  position: "absolute",
-
-  left: 20,
-
-  bottom: 150,
-
-  width: 72,
-
-  height: 72,
-
-  borderRadius: 36,
-
-  backgroundColor:
-    "#2563EB",
-
-  justifyContent:
-    "center",
-
-  alignItems:
-    "center",
-
-  shadowColor:
-    "#000",
-
-  shadowOpacity: 0.22,
-
-  shadowRadius: 12,
-
-  elevation: 10,
-},
-
   });

@@ -15,7 +15,10 @@ import {
   getStorage,
 } from "firebase/storage";
 
+// FIREBASE CONFIG
+
 const firebaseConfig = {
+
   apiKey:
     "AIzaSyCHIeTsYia5PUYmRqpOvgCUpOUM3vKuGxc",
 
@@ -35,19 +38,30 @@ const firebaseConfig = {
     "1:42501186216:web:76ccc1abf0782dff5c189d",
 };
 
+// INIT APP
+
 const app =
-  initializeApp(firebaseConfig);
+  initializeApp(
+    firebaseConfig
+  );
+
+// AUTH
 
 export const auth =
   initializeAuth(app, {
+
     persistence:
       getReactNativePersistence(
         AsyncStorage
       ),
   });
 
+// FIRESTORE
+
 export const db =
   getFirestore(app);
+
+// STORAGE
 
 export const storage =
   getStorage(app);

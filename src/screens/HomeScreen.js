@@ -12,7 +12,7 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
+  Platform,
 } from "react-native";
 
 import {
@@ -22,12 +22,13 @@ import {
   orderBy,
 } from "firebase/firestore";
 
-import { Ionicons } from "@expo/vector-icons";
+import {
+  Ionicons,
+} from "@expo/vector-icons";
 
 import { db } from "../firebaseConfig";
 
-import colors from "../theme/colors";
-import AppCard from "../components/AppCard";
+import TaskCard from "../components/TaskCard";
 
 export default function HomeScreen({
   navigation,
@@ -43,6 +44,143 @@ export default function HomeScreen({
     userLocation,
     setUserLocation,
   ] = useState(null);
+
+  const hasUnread =
+    false;
+
+  const categories = [
+
+    {
+      name:
+        "Flytting",
+
+      icon:
+        "home",
+
+      color:
+        "#22C55E",
+    },
+
+    {
+      name:
+        "Transport",
+
+      icon:
+        "car",
+
+      color:
+        "#0EA5E9",
+    },
+
+    {
+      name:
+        "Småjobber",
+
+      icon:
+        "flash",
+
+      color:
+        "#F59E0B",
+    },
+
+    {
+      name:
+        "Rengjøring",
+
+      icon:
+        "sparkles",
+
+      color:
+        "#8B5CF6",
+    },
+
+    {
+      name:
+        "IT",
+
+      icon:
+        "desktop",
+
+      color:
+        "#2563EB",
+    },
+
+    {
+      name:
+        "Barnepass",
+
+      icon:
+        "happy",
+
+      color:
+        "#EC4899",
+    },
+
+    {
+      name:
+        "Hage",
+
+      icon:
+        "leaf",
+
+      color:
+        "#16A34A",
+    },
+
+    {
+      name:
+        "Bygg",
+
+      icon:
+        "hammer",
+
+      color:
+        "#EA580C",
+    },
+
+    {
+      name:
+        "Annet",
+
+      icon:
+        "apps",
+
+      color:
+        "#6B7280",
+    },
+  ];
+
+  // SORT CATEGORIES
+
+  const sortedCategories =
+
+    [...categories].sort(
+
+      (a, b) => {
+
+        const countA =
+          tasks.filter(
+
+            (task) =>
+
+              task.category ===
+              a.name
+          ).length;
+
+        const countB =
+          tasks.filter(
+
+            (task) =>
+
+              task.category ===
+              b.name
+          ).length;
+
+        return (
+          countB - countA
+        );
+      }
+    );
 
   useEffect(() => {
 
@@ -74,22 +212,7 @@ export default function HomeScreen({
             }
           );
 
-          console.log(
-            "LOADED TASKS:",
-            taskList.length
-          );
-
           setTasks(taskList);
-
-          setLoading(false);
-        },
-
-        (error) => {
-
-          console.log(
-            "TASK LOAD ERROR:",
-            error
-          );
 
           setLoading(false);
         }
@@ -99,7 +222,7 @@ export default function HomeScreen({
 
   }, []);
 
-  // USER LOCATION
+  // LOCATION
 
   const getUserLocation =
     async () => {
@@ -134,68 +257,9 @@ export default function HomeScreen({
 
       } catch (e) {
 
-        console.log(
-          "LOCATION ERROR:",
-          e
-        );
+        console.log(e);
       }
     };
-
-  // TIME AGO
-
-  const getTimeAgo = (
-    timestamp
-  ) => {
-
-    if (!timestamp)
-      return "Nettopp";
-
-    let time =
-      timestamp;
-
-    if (
-      typeof timestamp ===
-        "object" &&
-      timestamp?.seconds
-    ) {
-
-      time =
-        timestamp.seconds *
-        1000;
-    }
-
-    const now =
-      Date.now();
-
-    const diff =
-      now - time;
-
-    const minutes =
-      Math.floor(
-        diff / 60000
-      );
-
-    const hours =
-      Math.floor(
-        minutes / 60
-      );
-
-    const days =
-      Math.floor(
-        hours / 24
-      );
-
-    if (minutes < 1)
-      return "Nettopp";
-
-    if (minutes < 60)
-      return `${minutes} min siden`;
-
-    if (hours < 24)
-      return `${hours} t siden`;
-
-    return `${days} d siden`;
-  };
 
   // DISTANCE
 
@@ -213,7 +277,7 @@ export default function HomeScreen({
       !lon2
     ) {
 
-      return 9999;
+      return 0;
     }
 
     const R = 6371;
@@ -259,7 +323,65 @@ export default function HomeScreen({
         Math.sqrt(1 - a)
       );
 
-    return R * c;
+    return Math.round(
+      R * c
+    );
+  };
+
+  // TIME AGO
+
+  const getTimeAgo = (
+    timestamp
+  ) => {
+
+    if (!timestamp)
+      return "Nå";
+
+    let time =
+      timestamp;
+
+    if (
+      typeof timestamp ===
+        "object" &&
+      timestamp?.seconds
+    ) {
+
+      time =
+        timestamp.seconds *
+        1000;
+    }
+
+    const now =
+      Date.now();
+
+    const diff =
+      now - time;
+
+    const minutes =
+      Math.floor(
+        diff / 60000
+      );
+
+    const hours =
+      Math.floor(
+        minutes / 60
+      );
+
+    const days =
+      Math.floor(
+        hours / 24
+      );
+
+    if (minutes < 1)
+      return "Nå";
+
+    if (minutes < 60)
+      return `${minutes} min`;
+
+    if (hours < 24)
+      return `${hours} t`;
+
+    return `${days} d`;
   };
 
   return (
@@ -270,7 +392,7 @@ export default function HomeScreen({
       }
 
       contentContainerStyle={{
-        paddingBottom: 120,
+        paddingBottom: 140,
       }}
 
       showsVerticalScrollIndicator={
@@ -288,59 +410,116 @@ export default function HomeScreen({
 
         <View>
 
-          <Image
-            source={require("../../assets/logo.png")}
-
+          <Text
             style={
               styles.logo
             }
-          />
+          >
+            Nær
+          </Text>
 
-          <Text
+          <View
             style={
-              styles.location
+              styles.locationRow
             }
           >
-            Oppdrag nær deg
-          </Text>
+
+            <Ionicons
+              name="location-outline"
+              size={14}
+              color="#111827"
+            />
+
+            <Text
+              style={
+                styles.locationText
+              }
+            >
+              Fauske
+            </Text>
+
+            <Ionicons
+              name="chevron-down"
+              size={14}
+              color="#111827"
+            />
+
+          </View>
 
         </View>
 
-        <TouchableOpacity>
+        <View
+          style={{
+            position:
+              "relative",
+          }}
+        >
 
-          <Ionicons
-            name="notifications-outline"
-
-            size={28}
-
-            color={
-              colors.dark
+          <TouchableOpacity
+            style={
+              styles.bellButton
             }
-          />
 
-        </TouchableOpacity>
+            onPress={() =>
+
+              navigation.navigate(
+                "Meldinger"
+              )
+            }
+          >
+
+            <Ionicons
+              name="notifications-outline"
+              size={22}
+              color="#111827"
+            />
+
+          </TouchableOpacity>
+
+          {hasUnread && (
+
+            <View
+              style={
+                styles.notificationDot
+              }
+            />
+          )}
+
+        </View>
 
       </View>
 
-      {/* HERO */}
+      {/* HERO BUTTONS */}
 
-      <View
+      <TouchableOpacity
+        activeOpacity={0.92}
+
         style={
-          styles.heroContainer
+          styles.helpButton
+        }
+
+        onPress={() =>
+          navigation.navigate(
+            "CreateTask"
+          )
         }
       >
 
-        <TouchableOpacity
+        <View
           style={
-            styles.needHelpCard
-          }
-
-          onPress={() =>
-            navigation.navigate(
-              "CreateTask"
-            )
+            styles.heroIcon
           }
         >
+
+          <Ionicons
+            name="hand-left"
+            size={22}
+            color="#FF5A4F"
+          />
+
+        </View>
+
+        <View>
 
           <Text
             style={
@@ -358,19 +537,39 @@ export default function HomeScreen({
             Opprett et oppdrag
           </Text>
 
-        </TouchableOpacity>
+        </View>
 
-        <TouchableOpacity
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        activeOpacity={0.92}
+
+        style={
+          styles.workButton
+        }
+
+        onPress={() =>
+          navigation.navigate(
+            "Tasks"
+          )
+        }
+      >
+
+        <View
           style={
-            styles.canHelpCard
-          }
-
-          onPress={() =>
-            navigation.navigate(
-              "Tasks"
-            )
+            styles.heroIcon
           }
         >
+
+          <Ionicons
+            name="hand-right"
+            size={22}
+            color="#22C55E"
+          />
+
+        </View>
+
+        <View>
 
           <Text
             style={
@@ -388,11 +587,11 @@ export default function HomeScreen({
             Se oppdrag nær deg
           </Text>
 
-        </TouchableOpacity>
+        </View>
 
-      </View>
+      </TouchableOpacity>
 
-      {/* SECTION */}
+      {/* CATEGORIES */}
 
       <View
         style={
@@ -405,37 +604,130 @@ export default function HomeScreen({
             styles.sectionTitle
           }
         >
-          Aktive oppdrag
+          Populære kategorier
         </Text>
 
       </View>
 
-      {/* LOADING */}
+      <ScrollView
+        horizontal
+
+        showsHorizontalScrollIndicator={
+          false
+        }
+
+        contentContainerStyle={{
+          paddingBottom: 8,
+        }}
+      >
+
+        {sortedCategories.map(
+          (category) => (
+
+            <TouchableOpacity
+              key={category.name}
+
+              activeOpacity={0.92}
+
+              onPress={() =>
+
+                navigation.navigate(
+                  "Tasks",
+
+                  {
+                    category:
+                      category.name,
+                  }
+                )
+              }
+
+              style={[
+                styles.categoryCard,
+
+                {
+                  backgroundColor:
+                    category.color,
+                },
+              ]}
+            >
+
+              <Ionicons
+                name={
+                  category.icon
+                }
+
+                size={20}
+
+                color="#FFFFFF"
+              />
+
+              <Text
+                style={
+                  styles.categoryTitle
+                }
+              >
+                {
+                  category.name
+                }
+              </Text>
+
+            </TouchableOpacity>
+          )
+        )}
+
+      </ScrollView>
+
+      {/* NEW TASKS */}
+
+      <View
+        style={[
+          styles.sectionHeader,
+
+          {
+            marginTop: 28,
+          },
+        ]}
+      >
+
+        <Text
+          style={
+            styles.sectionTitle
+          }
+        >
+          Nye oppdrag
+        </Text>
+
+        <TouchableOpacity
+          onPress={() =>
+            navigation.navigate(
+              "Tasks"
+            )
+          }
+        >
+
+          <Text
+            style={
+              styles.seeAll
+            }
+          >
+            Se alle
+          </Text>
+
+        </TouchableOpacity>
+
+      </View>
+
+      {/* TASKS */}
 
       {loading ? (
 
         <ActivityIndicator
           size="large"
-
-          color={
-            colors.primary
-          }
-
+          color="#22C55E"
           style={{
             marginTop: 40,
           }}
         />
-
-      ) : tasks.length ===
-        0 ? (
-
-        <Text
-          style={
-            styles.emptyText
-          }
-        >
-          Ingen oppdrag enda
-        </Text>
 
       ) : (
 
@@ -443,25 +735,18 @@ export default function HomeScreen({
 
           .sort((a, b) => {
 
-            if (
-              !userLocation
-            ) {
-
-              return 0;
-            }
-
             const distA =
               getDistance(
-                userLocation.latitude,
-                userLocation.longitude,
+                userLocation?.latitude,
+                userLocation?.longitude,
                 a.latitude,
                 a.longitude
               );
 
             const distB =
               getDistance(
-                userLocation.latitude,
-                userLocation.longitude,
+                userLocation?.latitude,
+                userLocation?.longitude,
                 b.latitude,
                 b.longitude
               );
@@ -471,10 +756,25 @@ export default function HomeScreen({
             );
           })
 
+          .slice(0, 8)
+
           .map((task) => (
 
-            <TouchableOpacity
+            <TaskCard
               key={task.id}
+
+              task={task}
+
+              distance={getDistance(
+                userLocation?.latitude,
+                userLocation?.longitude,
+                task.latitude,
+                task.longitude
+              )}
+
+              timeAgo={getTimeAgo(
+                task.createdAt
+              )}
 
               onPress={() =>
 
@@ -487,87 +787,7 @@ export default function HomeScreen({
                   }
                 )
               }
-            >
-
-              <AppCard
-                style={
-                  styles.taskCard
-                }
-              >
-
-                <View
-                  style={
-                    styles.taskRow
-                  }
-                >
-
-                  <View
-                    style={{
-                      flex: 1,
-
-                      marginRight: 10,
-                    }}
-                  >
-
-                    <Text
-                      style={
-                        styles.taskTitle
-                      }
-                    >
-                      {task.title}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.taskDescription
-                      }
-
-                      numberOfLines={
-                        2
-                      }
-                    >
-                      {
-                        task.description
-                      }
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.taskDistance
-                      }
-                    >
-                      {Math.round(
-                        getDistance(
-                          userLocation?.latitude,
-                          userLocation?.longitude,
-                          task.latitude,
-                          task.longitude
-                        )
-                      )}{" "}
-                      km unna •{" "}
-                      {getTimeAgo(
-                        task.createdAt
-                      )}
-                    </Text>
-
-                  </View>
-
-                  <Text
-                    style={
-                      styles.price
-                    }
-                  >
-                    {task.price
-                      ? `${task.price} kr`
-                      : task.reward ||
-                        "0 kr"}
-                  </Text>
-
-                </View>
-
-              </AppCard>
-
-            </TouchableOpacity>
+            />
           ))
       )}
 
@@ -583,11 +803,17 @@ const styles =
       flex: 1,
 
       backgroundColor:
-        colors.background,
+        "#F6F7FB",
 
       paddingHorizontal: 20,
 
-      paddingTop: 60,
+      paddingTop:
+        Platform.OS ===
+        "android"
+
+          ? 52
+
+          : 58,
     },
 
     header: {
@@ -601,92 +827,170 @@ const styles =
       alignItems:
         "center",
 
-      marginBottom: 30,
+      marginBottom: 28,
     },
 
     logo: {
 
-      width: 150,
+      fontSize: 36,
 
-      height: 60,
-    },
-
-    location: {
-
-      fontSize: 16,
+      fontWeight: "800",
 
       color:
-        colors.gray,
+        "#0F172A",
+    },
+
+    locationRow: {
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
 
       marginTop: 4,
     },
 
-    heroContainer: {
+    locationText: {
 
-      gap: 16,
+      marginHorizontal: 4,
+
+      fontSize: 14,
+
+      color:
+        "#111827",
+
+      fontWeight: "500",
+    },
+
+    bellButton: {
+
+      width: 46,
+
+      height: 46,
+
+      borderRadius: 16,
+
+      backgroundColor:
+        "#FFFFFF",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.05,
+
+      shadowRadius: 10,
+
+      elevation: 3,
+    },
+
+    notificationDot: {
+
+      position:
+        "absolute",
+
+      top: 0,
+
+      right: 0,
+
+      width: 14,
+
+      height: 14,
+
+      borderRadius: 999,
+
+      backgroundColor:
+        "#EF4444",
+
+      borderWidth: 2,
+
+      borderColor:
+        "#FFFFFF",
+    },
+
+    helpButton: {
+
+      backgroundColor:
+        "#FF5A4F",
+
+      borderRadius: 28,
+
+      padding: 22,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+
+      marginBottom: 14,
+    },
+
+    workButton: {
+
+      backgroundColor:
+        "#22C55E",
+
+      borderRadius: 28,
+
+      padding: 22,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
 
       marginBottom: 30,
     },
 
-    needHelpCard: {
+    heroIcon: {
+
+      width: 54,
+
+      height: 54,
+
+      borderRadius: 20,
 
       backgroundColor:
-        "#ff5f57",
+        "#FFFFFF",
 
-      padding: 24,
+      justifyContent:
+        "center",
 
-      borderRadius: 24,
-    },
+      alignItems:
+        "center",
 
-    canHelpCard: {
-
-      backgroundColor:
-        "#22c55e",
-
-      padding: 24,
-
-      borderRadius: 24,
+      marginRight: 16,
     },
 
     heroTitle: {
 
-      color: "#fff",
+      fontSize: 21,
 
-      fontSize: 24,
+      fontWeight: "800",
 
-      fontWeight: "700",
+      color:
+        "#FFFFFF",
 
-      marginBottom: 6,
+      marginBottom: 3,
     },
 
     heroSubtitle: {
 
-      color: "#fff",
+      fontSize: 14,
 
-      fontSize: 16,
+      color:
+        "#FFFFFF",
     },
 
     sectionHeader: {
-
-      marginBottom: 20,
-    },
-
-    sectionTitle: {
-
-      fontSize: 22,
-
-      fontWeight: "700",
-
-      color:
-        colors.dark,
-    },
-
-    taskCard: {
-
-      marginBottom: 16,
-    },
-
-    taskRow: {
 
       flexDirection:
         "row",
@@ -696,55 +1000,63 @@ const styles =
 
       alignItems:
         "center",
+
+      marginBottom: 16,
     },
 
-    taskTitle: {
+    sectionTitle: {
 
-      fontSize: 18,
-
-      fontWeight: "700",
-
-      color:
-        colors.dark,
-
-      marginBottom: 6,
-    },
-
-    taskDescription: {
-
-      color:
-        colors.gray,
-
-      marginBottom: 8,
-    },
-
-    taskDistance: {
-
-      color:
-        colors.gray,
-
-      fontSize: 14,
-    },
-
-    price: {
-
-      fontSize: 20,
+      fontSize: 21,
 
       fontWeight: "800",
 
-      color: "#22c55e",
+      color:
+        "#111827",
     },
 
-    emptyText: {
+    seeAll: {
+
+      fontSize: 14,
+
+      color:
+        "#22C55E",
+
+      fontWeight: "700",
+    },
+
+    categoryCard: {
+
+      width: 88,
+
+      height: 88,
+
+      borderRadius: 22,
+
+      padding: 14,
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      marginRight: 12,
+    },
+
+    categoryTitle: {
+
+      color:
+        "#FFFFFF",
+
+      fontSize: 11,
+
+      fontWeight: "800",
+
+      lineHeight: 15,
 
       textAlign:
         "center",
 
-      marginTop: 50,
-
-      color:
-        colors.gray,
-
-      fontSize: 16,
+      marginTop: 8,
     },
   });

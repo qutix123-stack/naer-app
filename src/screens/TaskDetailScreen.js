@@ -11,7 +11,17 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  StyleSheet,
+  Platform,
 } from "react-native";
+
+import {
+  Ionicons,
+} from "@expo/vector-icons";
+
+import {
+  LinearGradient,
+} from "expo-linear-gradient";
 
 import {
   doc,
@@ -32,49 +42,6 @@ export default function TaskDetailScreen({
   const taskId =
     route?.params?.taskId;
 
-  console.log(
-    "TASK ID:",
-    taskId
-  );
-
-  console.log(
-    "TYPEOF TASKID:",
-    typeof taskId
-  );
-
-  if (!taskId) {
-
-    return (
-
-      <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-        }}
-      >
-
-        <Text
-          style={{
-            fontSize: 18,
-
-            color: "#111827",
-          }}
-        >
-          Task mangler ID
-        </Text>
-
-      </View>
-    );
-  }
-
   const [task, setTask] =
     useState(null);
 
@@ -84,104 +51,64 @@ export default function TaskDetailScreen({
   const [accepting, setAccepting] =
     useState(false);
 
-  // LOAD TASK
+  const [completing, setCompleting] =
+    useState(false);
 
   useEffect(() => {
-
-    const loadTask =
-      async () => {
-
-        try {
-
-          console.log(
-            "FETCHING TASK:",
-            taskId
-          );
-
-          const ref =
-            doc(
-              db,
-              "tasks",
-              String(taskId)
-            );
-
-          const snapshot =
-            await getDoc(ref);
-
-          console.log(
-            "SNAPSHOT EXISTS:",
-            snapshot.exists()
-          );
-
-          if (
-            snapshot.exists()
-          ) {
-
-            const data =
-              snapshot.data();
-
-            console.log(
-              "TASK DATA:",
-              JSON.stringify(data)
-            );
-
-            setTask({
-              id:
-                snapshot.id,
-
-              ...data,
-            });
-
-          } else {
-
-            console.log(
-              "TASK NOT FOUND"
-            );
-
-            Alert.alert(
-              "Oppdrag finnes ikke"
-            );
-          }
-
-        } catch (e) {
-
-          console.log(
-            "TASK DETAIL ERROR FULL:",
-            JSON.stringify(e)
-          );
-
-          console.log(
-            "TASK DETAIL ERROR:",
-            e
-          );
-
-          Alert.alert(
-            "Kunne ikke laste oppdrag"
-          );
-
-        } finally {
-
-          setLoading(false);
-        }
-      };
 
     loadTask();
 
   }, []);
 
-  // ACCEPT TASK
-
-  const handleAcceptTask =
+  const loadTask =
     async () => {
 
       try {
 
-        if (!task?.id) {
+        const ref =
+          doc(
+            db,
+            "tasks",
+            String(taskId)
+          );
 
-          return Alert.alert(
-            "Task mangler ID"
+        const snapshot =
+          await getDoc(ref);
+
+        if (
+          snapshot.exists()
+        ) {
+
+          setTask({
+            id:
+              snapshot.id,
+
+            ...snapshot.data(),
+          });
+
+        } else {
+
+          Alert.alert(
+            "Oppdrag finnes ikke"
           );
         }
+
+      } catch (e) {
+
+        console.log(e);
+
+      } finally {
+
+        setLoading(false);
+      }
+    };
+
+  // ACCEPT
+
+  const handleAccept =
+    async () => {
+
+      try {
 
         setAccepting(true);
 
@@ -198,6 +125,12 @@ export default function TaskDetailScreen({
             acceptedBy:
               auth.currentUser?.uid,
 
+            acceptedByName:
+              auth.currentUser
+                ?.displayName ||
+
+              "Bruker",
+
             acceptedAt:
               Date.now(),
 
@@ -210,22 +143,83 @@ export default function TaskDetailScreen({
           "Oppdrag akseptert 🔥"
         );
 
-        navigation.goBack();
+        loadTask();
 
       } catch (e) {
 
-        console.log(
-          "ACCEPT ERROR:",
-          e
-        );
-
-        Alert.alert(
-          "Kunne ikke akseptere oppdrag"
-        );
+        console.log(e);
 
       } finally {
 
         setAccepting(false);
+      }
+    };
+
+  // COMPLETE
+
+  const completeTask =
+    async () => {
+
+      try {
+
+        setCompleting(true);
+
+        await updateDoc(
+          doc(
+            db,
+            "tasks",
+            task.id
+          ),
+
+          {
+            completed:
+              true,
+
+            completedAt:
+              Date.now(),
+
+            status:
+              "completed",
+          }
+        );
+
+        navigation.navigate(
+          "Review",
+
+          {
+            taskId:
+              task.id,
+
+            taskTitle:
+              task.title,
+
+            toUserEmail:
+
+              auth.currentUser?.uid ===
+              task.ownerId
+
+                ? task.acceptedByEmail
+
+                : task.creatorEmail,
+
+            toUserName:
+
+              auth.currentUser?.uid ===
+              task.ownerId
+
+                ? task.acceptedByName
+
+                : task.creatorName,
+          }
+        );
+
+      } catch (e) {
+
+        console.log(e);
+
+      } finally {
+
+        setCompleting(false);
       }
     };
 
@@ -236,57 +230,31 @@ export default function TaskDetailScreen({
     return (
 
       <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-        }}
+        style={
+          styles.center
+        }
       >
 
         <ActivityIndicator
           size="large"
-          color="#2563EB"
+          color="#22C55E"
         />
 
       </View>
     );
   }
 
-  // NO TASK
-
   if (!task) {
 
     return (
 
       <View
-        style={{
-          flex: 1,
-
-          justifyContent:
-            "center",
-
-          alignItems:
-            "center",
-
-          backgroundColor:
-            "#F4F6F8",
-        }}
+        style={
+          styles.center
+        }
       >
 
-        <Text
-          style={{
-            fontSize: 18,
-
-            color: "#111827",
-          }}
-        >
+        <Text>
           Oppdrag finnes ikke
         </Text>
 
@@ -294,307 +262,952 @@ export default function TaskDetailScreen({
     );
   }
 
+  const isAccepted =
+    task?.accepted;
+
+  const isCompleted =
+    task?.completed;
+
+  const isOwner =
+    auth.currentUser?.uid ===
+    task?.ownerId;
+
+  const canComplete =
+
+    isAccepted &&
+    !isCompleted &&
+
+    (
+      isOwner ||
+
+      auth.currentUser?.uid ===
+      task?.acceptedBy
+    );
+
   return (
 
     <View
-      style={{
-        flex: 1,
-
-        backgroundColor:
-          "#F4F6F8",
-      }}
+      style={
+        styles.container
+      }
     >
 
       <ScrollView
-        contentContainerStyle={{
-          paddingBottom: 140,
-        }}
-
         showsVerticalScrollIndicator={
           false
         }
+
+        contentContainerStyle={{
+          paddingBottom: 180,
+        }}
       >
 
-        {/* IMAGE */}
+        {/* HERO IMAGE */}
 
-        {task?.image ? (
+        <View
+          style={
+            styles.hero
+          }
+        >
 
-          <Image
-            source={{
-              uri:
-                task.image,
-            }}
+          {task?.image ? (
 
-            style={{
-              width: "100%",
+            <Image
+              source={{
+                uri:
+                  task.image,
+              }}
 
-              height: 280,
-            }}
+              style={
+                styles.image
+              }
+            />
 
-            resizeMode="cover"
+          ) : (
+
+            <View
+              style={
+                styles.placeholder
+              }
+            >
+
+              <Ionicons
+                name="image-outline"
+                size={64}
+                color="#9CA3AF"
+              />
+
+            </View>
+          )}
+
+          {/* OVERLAY */}
+
+          <LinearGradient
+            colors={[
+              "transparent",
+              "rgba(0,0,0,0.78)",
+            ]}
+
+            style={
+              styles.overlay
+            }
           />
 
-        ) : (
+          {/* TOP BAR */}
 
           <View
-            style={{
-              width: "100%",
-
-              height: 280,
-
-              backgroundColor:
-                "#E5E7EB",
-
-              justifyContent:
-                "center",
-
-              alignItems:
-                "center",
-            }}
+            style={
+              styles.topBar
+            }
           >
 
-            <Text
-              style={{
-                fontSize: 50,
-              }}
+            <TouchableOpacity
+              activeOpacity={0.9}
+
+              style={
+                styles.topButton
+              }
+
+              onPress={() =>
+                navigation.goBack()
+              }
             >
-              📦
-            </Text>
+
+              <Ionicons
+                name="arrow-back"
+                size={22}
+                color="#111827"
+              />
+
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+
+              style={
+                styles.topButton
+              }
+            >
+
+              <Ionicons
+                name="heart-outline"
+                size={22}
+                color="#111827"
+              />
+
+            </TouchableOpacity>
 
           </View>
-        )}
+
+          {/* HERO CONTENT */}
+
+          <View
+            style={
+              styles.heroContent
+            }
+          >
+
+            {/* STATUS */}
+
+            {isCompleted ? (
+
+              <View
+                style={
+                  styles.completedBadge
+                }
+              >
+
+                <Ionicons
+                  name="checkmark-circle"
+                  size={16}
+                  color="#16A34A"
+                />
+
+                <Text
+                  style={
+                    styles.completedText
+                  }
+                >
+                  Fullført
+                </Text>
+
+              </View>
+
+            ) : isAccepted ? (
+
+              <View
+                style={
+                  styles.acceptedBadge
+                }
+              >
+
+                <Ionicons
+                  name="flash"
+                  size={16}
+                  color="#2563EB"
+                />
+
+                <Text
+                  style={
+                    styles.acceptedText
+                  }
+                >
+                  Akseptert
+                </Text>
+
+              </View>
+
+            ) : (
+
+              <View
+                style={
+                  styles.categoryBadge
+                }
+              >
+
+                <Text
+                  style={
+                    styles.categoryText
+                  }
+                >
+                  {task?.category ||
+                    "Diverse"}
+                </Text>
+
+              </View>
+            )}
+
+            <Text
+              style={
+                styles.title
+              }
+            >
+              {task?.title}
+            </Text>
+
+            <View
+              style={
+                styles.heroMeta
+              }
+            >
+
+              <Text
+                style={
+                  styles.meta
+                }
+              >
+                📍 2 km unna
+              </Text>
+
+              <Text
+                style={
+                  styles.meta
+                }
+              >
+                Aktiv nå
+              </Text>
+
+            </View>
+
+          </View>
+
+        </View>
 
         {/* CONTENT */}
 
         <View
-          style={{
-            padding: 24,
-          }}
+          style={
+            styles.content
+          }
         >
-
-          {/* CATEGORY */}
-
-          <View
-            style={{
-              alignSelf:
-                "flex-start",
-
-              backgroundColor:
-                "#DBEAFE",
-
-              paddingHorizontal: 14,
-
-              paddingVertical: 8,
-
-              borderRadius: 999,
-
-              marginBottom: 18,
-            }}
-          >
-
-            <Text
-              style={{
-                color: "#2563EB",
-
-                fontWeight: "700",
-              }}
-            >
-              {task?.category ||
-                "Annet"}
-            </Text>
-
-          </View>
-
-          {/* TITLE */}
-
-          <Text
-            style={{
-              fontSize: 34,
-
-              fontWeight: "bold",
-
-              color: "#111827",
-
-              marginBottom: 16,
-            }}
-          >
-            {task?.title ||
-              "Ingen tittel"}
-          </Text>
 
           {/* PRICE */}
 
-          <Text
-            style={{
-              fontSize: 28,
-
-              fontWeight: "bold",
-
-              color: "#22C55E",
-
-              marginBottom: 24,
-            }}
+          <View
+            style={
+              styles.priceCard
+            }
           >
-            {task?.price
-              ? `${task.price} kr`
-              : task?.reward ||
-                "0 kr"}
-          </Text>
+
+            <Text
+              style={
+                styles.priceLabel
+              }
+            >
+              Pris
+            </Text>
+
+            <Text
+              style={
+                styles.price
+              }
+            >
+              {task?.price ||
+                0} kr
+            </Text>
+
+          </View>
 
           {/* DESCRIPTION */}
 
-          <Text
-            style={{
-              fontSize: 18,
-
-              lineHeight: 30,
-
-              color: "#374151",
-
-              marginBottom: 32,
-            }}
-          >
-            {task?.description ||
-              "Ingen beskrivelse"}
-          </Text>
-
-          {/* CREATOR */}
-
           <View
-            style={{
-              backgroundColor:
-                "#FFFFFF",
-
-              padding: 22,
-
-              borderRadius: 24,
-
-              marginBottom: 24,
-            }}
+            style={
+              styles.section
+            }
           >
 
             <Text
-              style={{
-                color: "#6B7280",
-
-                marginBottom: 8,
-              }}
+              style={
+                styles.sectionTitle
+              }
             >
-              Opprettet av
+              Beskrivelse
             </Text>
 
             <Text
-              style={{
-                fontSize: 18,
-
-                fontWeight: "700",
-
-                color: "#111827",
-              }}
+              style={
+                styles.description
+              }
             >
-              {task?.creatorName ||
-                "Bruker"}
+              {task?.description}
             </Text>
 
           </View>
 
-          {/* LOCATION */}
+          {/* USER */}
 
           <View
-            style={{
-              backgroundColor:
-                "#FFFFFF",
-
-              padding: 22,
-
-              borderRadius: 24,
-
-              marginBottom: 30,
-            }}
+            style={
+              styles.userCard
+            }
           >
 
-            <Text
+            <View
+              style={
+                styles.avatar
+              }
+            >
+
+              <Ionicons
+                name="person"
+                size={24}
+                color="#111827"
+              />
+
+            </View>
+
+            <View
               style={{
-                fontSize: 18,
-
-                fontWeight: "700",
-
-                color: "#111827",
-
-                marginBottom: 8,
+                flex: 1,
               }}
             >
-              Lokasjon
-            </Text>
 
-            <Text
-              style={{
-                color: "#6B7280",
-              }}
+              <Text
+                style={
+                  styles.userLabel
+                }
+              >
+                Opprettet av
+              </Text>
+
+              <Text
+                style={
+                  styles.userName
+                }
+              >
+                {task?.creatorName ||
+                  "Bruker"}
+              </Text>
+
+            </View>
+
+            <View
+              style={
+                styles.ratingBadge
+              }
             >
-              GPS registrert
-            </Text>
+
+              <Text
+                style={
+                  styles.ratingText
+                }
+              >
+                ⭐ 5.0
+              </Text>
+
+            </View>
 
           </View>
-
-          {/* ACCEPT BUTTON */}
-
-          {!task?.accepted && (
-
-            <TouchableOpacity
-              disabled={
-                accepting
-              }
-
-              onPress={
-                handleAcceptTask
-              }
-
-              style={{
-                backgroundColor:
-                  accepting
-                    ? "#93C5FD"
-                    : "#2563EB",
-
-                padding: 24,
-
-                borderRadius: 28,
-
-                alignItems:
-                  "center",
-              }}
-            >
-
-              {accepting ? (
-
-                <ActivityIndicator
-                  color="white"
-                />
-
-              ) : (
-
-                <Text
-                  style={{
-                    color:
-                      "#FFFFFF",
-
-                    fontSize: 22,
-
-                    fontWeight:
-                      "bold",
-                  }}
-                >
-                  Aksepter oppdrag
-                </Text>
-              )}
-
-            </TouchableOpacity>
-          )}
 
         </View>
 
       </ScrollView>
 
+      {/* CTA */}
+
+      {!isAccepted && (
+
+        <TouchableOpacity
+          activeOpacity={0.92}
+
+          style={
+            styles.acceptButton
+          }
+
+          disabled={
+            accepting
+          }
+
+          onPress={
+            handleAccept
+          }
+        >
+
+          {accepting ? (
+
+            <ActivityIndicator
+              color="#FFFFFF"
+            />
+
+          ) : (
+
+            <Text
+              style={
+                styles.acceptText
+              }
+            >
+              Aksepter oppdrag
+            </Text>
+          )}
+
+        </TouchableOpacity>
+      )}
+
+      {canComplete && (
+
+        <TouchableOpacity
+          activeOpacity={0.92}
+
+          style={
+            styles.completeButton
+          }
+
+          disabled={
+            completing
+          }
+
+          onPress={
+            completeTask
+          }
+        >
+
+          {completing ? (
+
+            <ActivityIndicator
+              color="#FFFFFF"
+            />
+
+          ) : (
+
+            <Text
+              style={
+                styles.completeText
+              }
+            >
+              Fullfør oppdrag
+            </Text>
+          )}
+
+        </TouchableOpacity>
+      )}
+
     </View>
   );
 }
+
+const styles =
+  StyleSheet.create({
+
+    container: {
+
+      flex: 1,
+
+      backgroundColor:
+        "#F8FAFC",
+    },
+
+    center: {
+
+      flex: 1,
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+    },
+
+    hero: {
+
+      height: 420,
+
+      position:
+        "relative",
+    },
+
+    image: {
+
+      width: "100%",
+
+      height: "100%",
+    },
+
+    placeholder: {
+
+      width: "100%",
+
+      height: "100%",
+
+      backgroundColor:
+        "#E5E7EB",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+    },
+
+    overlay: {
+
+      position:
+        "absolute",
+
+      left: 0,
+
+      right: 0,
+
+      bottom: 0,
+
+      height: 220,
+    },
+
+    topBar: {
+
+      position:
+        "absolute",
+
+      top:
+        Platform.OS ===
+        "android"
+
+          ? 58
+
+          : 70,
+
+      left: 20,
+
+      right: 20,
+
+      flexDirection:
+        "row",
+
+      justifyContent:
+        "space-between",
+    },
+
+    topButton: {
+
+      width: 48,
+
+      height: 48,
+
+      borderRadius: 18,
+
+      backgroundColor:
+        "rgba(255,255,255,0.96)",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+    },
+
+    heroContent: {
+
+      position:
+        "absolute",
+
+      left: 24,
+
+      right: 24,
+
+      bottom: 34,
+    },
+
+    categoryBadge: {
+
+      alignSelf:
+        "flex-start",
+
+      backgroundColor:
+        "#22C55E",
+
+      paddingHorizontal: 14,
+
+      paddingVertical: 8,
+
+      borderRadius: 999,
+
+      marginBottom: 16,
+    },
+
+    categoryText: {
+
+      color:
+        "#FFFFFF",
+
+      fontSize: 13,
+
+      fontWeight: "700",
+    },
+
+    acceptedBadge: {
+
+      alignSelf:
+        "flex-start",
+
+      backgroundColor:
+        "#2563EB",
+
+      paddingHorizontal: 14,
+
+      paddingVertical: 8,
+
+      borderRadius: 999,
+
+      marginBottom: 16,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+    },
+
+    acceptedText: {
+
+      color:
+        "#FFFFFF",
+
+      marginLeft: 6,
+
+      fontWeight: "700",
+    },
+
+    completedBadge: {
+
+      alignSelf:
+        "flex-start",
+
+      backgroundColor:
+        "#16A34A",
+
+      paddingHorizontal: 14,
+
+      paddingVertical: 8,
+
+      borderRadius: 999,
+
+      marginBottom: 16,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+    },
+
+    completedText: {
+
+      color:
+        "#FFFFFF",
+
+      marginLeft: 6,
+
+      fontWeight: "700",
+    },
+
+    title: {
+
+      fontSize: 34,
+
+      fontWeight: "800",
+
+      color:
+        "#FFFFFF",
+
+      lineHeight: 42,
+
+      marginBottom: 14,
+    },
+
+    heroMeta: {
+
+      flexDirection:
+        "row",
+    },
+
+    meta: {
+
+      color:
+        "rgba(255,255,255,0.88)",
+
+      fontSize: 14,
+
+      fontWeight: "600",
+
+      marginRight: 18,
+    },
+
+    content: {
+
+      padding: 22,
+    },
+
+    priceCard: {
+
+      backgroundColor:
+        "#FFFFFF",
+
+      borderRadius: 28,
+
+      padding: 22,
+
+      marginTop: -54,
+
+      marginBottom: 22,
+
+      shadowColor:
+        "#000",
+
+      shadowOpacity: 0.08,
+
+      shadowRadius: 18,
+
+      elevation: 6,
+    },
+
+    priceLabel: {
+
+      fontSize: 14,
+
+      color:
+        "#6B7280",
+
+      marginBottom: 8,
+    },
+
+    price: {
+
+      fontSize: 34,
+
+      fontWeight: "800",
+
+      color:
+        "#22C55E",
+    },
+
+    section: {
+
+      backgroundColor:
+        "#FFFFFF",
+
+      borderRadius: 28,
+
+      padding: 22,
+
+      marginBottom: 22,
+    },
+
+    sectionTitle: {
+
+      fontSize: 18,
+
+      fontWeight: "800",
+
+      color:
+        "#111827",
+
+      marginBottom: 14,
+    },
+
+    description: {
+
+      fontSize: 15,
+
+      color:
+        "#4B5563",
+
+      lineHeight: 28,
+    },
+
+    userCard: {
+
+      backgroundColor:
+        "#FFFFFF",
+
+      borderRadius: 28,
+
+      padding: 20,
+
+      flexDirection:
+        "row",
+
+      alignItems:
+        "center",
+    },
+
+    avatar: {
+
+      width: 58,
+
+      height: 58,
+
+      borderRadius: 22,
+
+      backgroundColor:
+        "#F3F4F6",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+
+      marginRight: 16,
+    },
+
+    userLabel: {
+
+      fontSize: 13,
+
+      color:
+        "#9CA3AF",
+
+      marginBottom: 4,
+    },
+
+    userName: {
+
+      fontSize: 17,
+
+      fontWeight: "700",
+
+      color:
+        "#111827",
+    },
+
+    ratingBadge: {
+
+      backgroundColor:
+        "#FEF3C7",
+
+      paddingHorizontal: 12,
+
+      paddingVertical: 8,
+
+      borderRadius: 14,
+    },
+
+    ratingText: {
+
+      fontWeight: "700",
+
+      color:
+        "#92400E",
+    },
+
+    acceptButton: {
+
+      position:
+        "absolute",
+
+      left: 20,
+
+      right: 20,
+
+      bottom: 38,
+
+      backgroundColor:
+        "#22C55E",
+
+      borderRadius: 24,
+
+      paddingVertical: 20,
+
+      alignItems:
+        "center",
+
+      shadowColor:
+        "#22C55E",
+
+      shadowOpacity: 0.25,
+
+      shadowRadius: 12,
+
+      elevation: 8,
+    },
+
+    acceptText: {
+
+      color:
+        "#FFFFFF",
+
+      fontSize: 17,
+
+      fontWeight: "800",
+    },
+
+    completeButton: {
+
+      position:
+        "absolute",
+
+      left: 20,
+
+      right: 20,
+
+      bottom: 38,
+
+      backgroundColor:
+        "#2563EB",
+
+      borderRadius: 24,
+
+      paddingVertical: 20,
+
+      alignItems:
+        "center",
+
+      shadowColor:
+        "#2563EB",
+
+      shadowOpacity: 0.25,
+
+      shadowRadius: 12,
+
+      elevation: 8,
+    },
+
+    completeText: {
+
+      color:
+        "#FFFFFF",
+
+      fontSize: 17,
+
+      fontWeight: "800",
+    },
+  });

@@ -4,17 +4,21 @@ import {
 } from "react";
 
 import {
+  View,
+  Platform,
+} from "react-native";
+
+import * as Notifications from "expo-notifications";
+
+import * as Device from "expo-device";
+
+import {
   onAuthStateChanged,
 } from "firebase/auth";
 
 import {
   auth,
 } from "./src/firebaseConfig";
-
-import {
-  View,
-  Platform,
-} from "react-native";
 
 import {
   Ionicons,
@@ -45,14 +49,42 @@ import {
 // SCREENS
 
 import LoginScreen from "./src/screens/LoginScreen";
+
 import HomeScreen from "./src/screens/HomeScreen";
+
 import TasksScreen from "./src/screens/TasksScreen";
+
 import TaskDetailScreen from "./src/screens/TaskDetailScreen";
+
 import CreateTaskScreen from "./src/screens/CreateTaskScreen";
+
 import MessagesScreen from "./src/screens/MessagesScreen";
+
 import ChatScreen from "./src/screens/ChatScreen";
+
 import ProfileScreen from "./src/screens/ProfileScreen";
+
 import MapScreen from "./src/screens/MapScreen";
+
+import ReviewScreen from "./src/screens/ReviewScreen";
+
+// PUSH NOTIFICATION HANDLER
+
+Notifications.setNotificationHandler({
+
+  handleNotification:
+    async () => ({
+
+      shouldShowAlert:
+        true,
+
+      shouldPlaySound:
+        true,
+
+      shouldSetBadge:
+        true,
+    }),
+});
 
 const Stack =
   createNativeStackNavigator();
@@ -85,17 +117,17 @@ function Tabs() {
           position:
             "absolute",
 
+          left: 20,
+
+          right: 20,
+
           bottom:
             Platform.OS ===
             "ios"
-              ? 28
-              : 18,
+              ? 10
+              : 8,
 
-          left: 18,
-
-          right: 18,
-
-          height: 78,
+          height: 74,
 
           borderRadius: 28,
 
@@ -103,6 +135,15 @@ function Tabs() {
 
           backgroundColor:
             "#FFFFFF",
+
+          shadowColor:
+            "#000",
+
+          shadowOpacity: 0.08,
+
+          shadowRadius: 14,
+
+          elevation: 8,
         },
 
         tabBarIcon: ({
@@ -123,7 +164,7 @@ function Tabs() {
 
           } else if (
             route.name ===
-            "Map"
+            "Kart"
           ) {
 
             iconName =
@@ -137,9 +178,7 @@ function Tabs() {
           ) {
 
             iconName =
-              focused
-                ? "add-circle"
-                : "add-circle-outline";
+              "add";
 
           } else if (
             route.name ===
@@ -162,6 +201,58 @@ function Tabs() {
                 : "person-outline";
           }
 
+          // CREATE BUTTON
+
+          if (
+            route.name ===
+            "Opprett"
+          ) {
+
+            return (
+
+              <View
+                style={{
+
+                  width: 58,
+
+                  height: 58,
+
+                  borderRadius: 20,
+
+                  backgroundColor:
+                    "#2563EB",
+
+                  justifyContent:
+                    "center",
+
+                  alignItems:
+                    "center",
+
+                  marginBottom: 22,
+
+                  shadowColor:
+                    "#2563EB",
+
+                  shadowOpacity: 0.25,
+
+                  shadowRadius: 10,
+
+                  elevation: 8,
+                }}
+              >
+
+                <Ionicons
+                  name="add"
+
+                  size={30}
+
+                  color="#FFFFFF"
+                />
+
+              </View>
+            );
+          }
+
           return (
 
             <View
@@ -181,13 +272,13 @@ function Tabs() {
 
                 size={
                   focused
-                    ? 30
-                    : 26
+                    ? 28
+                    : 24
                 }
 
                 color={
                   focused
-                    ? "#2563EB"
+                    ? "#111827"
                     : "#9CA3AF"
                 }
               />
@@ -206,7 +297,7 @@ function Tabs() {
       />
 
       <Tab.Screen
-        name="Map"
+        name="Kart"
         component={
           MapScreen
         }
@@ -242,11 +333,14 @@ export default function App() {
   const [user, setUser] =
     useState(null);
 
+  // AUTH
+
   useEffect(() => {
 
     const unsubscribe =
       onAuthStateChanged(
         auth,
+
         (user) => {
 
           setUser(user);
@@ -256,6 +350,102 @@ export default function App() {
     return unsubscribe;
 
   }, []);
+
+  // PUSH NOTIFICATIONS
+
+  useEffect(() => {
+
+    registerForPushNotifications();
+
+  }, []);
+
+  const registerForPushNotifications =
+    async () => {
+
+      try {
+
+        if (
+          Device.isDevice
+        ) {
+
+          const {
+            status:
+              existingStatus,
+          } =
+            await Notifications.getPermissionsAsync();
+
+          let finalStatus =
+            existingStatus;
+
+          if (
+            existingStatus !==
+            "granted"
+          ) {
+
+            const {
+              status,
+            } =
+              await Notifications.requestPermissionsAsync();
+
+            finalStatus =
+              status;
+          }
+
+          if (
+            finalStatus !==
+            "granted"
+          ) {
+
+            alert(
+              "Push notifications må tillates 😄"
+            );
+
+            return;
+          }
+
+          const token =
+            await Notifications.getExpoPushTokenAsync();
+
+          console.log(
+            "EXPO PUSH TOKEN:",
+            token.data
+          );
+        }
+
+        // ANDROID CHANNEL
+
+        if (
+          Platform.OS ===
+          "android"
+        ) {
+
+          await Notifications.setNotificationChannelAsync(
+            "default",
+
+            {
+              name:
+                "default",
+
+              importance:
+                Notifications.AndroidImportance.MAX,
+
+              vibrationPattern:
+                [0, 250, 250, 250],
+
+              lightColor:
+                "#2563EB",
+            }
+          );
+        }
+
+      } catch (e) {
+
+        console.log(
+          "PUSH ERROR:",
+          e
+        );
+      }
+    };
 
   return (
 
@@ -268,18 +458,11 @@ export default function App() {
           <Stack.Navigator
             screenOptions={{
 
-              headerShadowVisible:
+              headerShown:
                 false,
 
-              headerStyle: {
-                backgroundColor:
-                  "#FFFFFF",
-              },
-
-              headerTitleStyle: {
-                fontWeight:
-                  "bold",
-              },
+              animation:
+                "slide_from_right",
             }}
           >
 
@@ -291,11 +474,6 @@ export default function App() {
                 component={
                   Tabs
                 }
-
-                options={{
-                  headerShown:
-                    false,
-                }}
               />
 
             ) : (
@@ -306,11 +484,6 @@ export default function App() {
                 component={
                   LoginScreen
                 }
-
-                options={{
-                  headerShown:
-                    false,
-                }}
               />
             )}
 
@@ -320,11 +493,6 @@ export default function App() {
               component={
                 TasksScreen
               }
-
-              options={{
-                headerShown:
-                  false,
-              }}
             />
 
             <Stack.Screen
@@ -333,11 +501,6 @@ export default function App() {
               component={
                 TaskDetailScreen
               }
-
-              options={{
-                title:
-                  "Oppdrag",
-              }}
             />
 
             <Stack.Screen
@@ -346,11 +509,6 @@ export default function App() {
               component={
                 CreateTaskScreen
               }
-
-              options={{
-                headerShown:
-                  false,
-              }}
             />
 
             <Stack.Screen
@@ -359,11 +517,14 @@ export default function App() {
               component={
                 ChatScreen
               }
+            />
 
-              options={{
-                headerShown:
-                  false,
-              }}
+            <Stack.Screen
+              name="Review"
+
+              component={
+                ReviewScreen
+              }
             />
 
           </Stack.Navigator>
