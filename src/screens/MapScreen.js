@@ -131,41 +131,59 @@ export default function MapScreen({
   // LOCATION
 
   const loadLocation =
-    async () => {
+  async () => {
 
-      try {
+    try {
 
-        const { status } =
-          await Location.requestForegroundPermissionsAsync();
+      const { status } =
+        await Location.requestForegroundPermissionsAsync();
 
-        if (
-          status !==
-          "granted"
-        ) {
-
-          setLoading(false);
-
-          return;
-        }
-
-        const location =
-          await Location.getCurrentPositionAsync(
-            {}
-          );
-
-        setUserLocation(
-          location.coords
-        );
-
-      } catch (e) {
-
-        console.log(e);
-
-      } finally {
+      if (
+        status !==
+        "granted"
+      ) {
 
         setLoading(false);
+
+        return;
       }
-    };
+
+      const location =
+        await Location.getCurrentPositionAsync(
+          {}
+        );
+
+      setUserLocation(
+        location.coords
+      );
+
+      mapRef.current?.animateToRegion(
+        {
+          latitude:
+            location.coords.latitude,
+
+          longitude:
+            location.coords.longitude,
+
+          latitudeDelta:
+            0.03,
+
+          longitudeDelta:
+            0.03,
+        },
+
+        1000
+      );
+
+    } catch (e) {
+
+      console.log(e);
+
+    } finally {
+
+      setLoading(false);
+    }
+  };
 
   // CATEGORY COLORS
 
@@ -362,6 +380,9 @@ export default function MapScreen({
         <MapView
           ref={mapRef}
 
+          showsPointsOfInterest={false}
+          showsBuildings={false}  
+
           style={
             styles.map
           }
@@ -395,53 +416,16 @@ export default function MapScreen({
             (task) => (
 
               <Marker
-                key={task.id}
-
-                coordinate={{
-                  latitude:
-                    Number(
-                      task.latitude
-                    ),
-
-                  longitude:
-                    Number(
-                      task.longitude
-                    ),
-                }}
-
-                onPress={() =>
-                  setSelectedTask(
-                    task
-                  )
-                }
-              >
-
-                <View
-                  style={[
-                    styles.marker,
-
-                    {
-                      backgroundColor:
-                        getCategoryColor(
-                          task.category
-                        ),
-                    },
-                  ]}
-                >
-
-                  <Ionicons
-                    name={getCategoryIcon(
-                      task.category
-                    )}
-
-                    size={17}
-
-                    color="#FFFFFF"
-                  />
-
-                </View>
-
-              </Marker>
+  key={task.id}
+  coordinate={{
+    latitude: Number(task.latitude),
+    longitude: Number(task.longitude),
+  }}
+  title={task.title}
+  onPress={() =>
+    setSelectedTask(task)
+  }
+/>
             )
           )}
 
@@ -910,32 +894,23 @@ const styles =
 
     marker: {
 
-      width: 42,
+  width: 48,
 
-      height: 42,
+  height: 48,
 
-      borderRadius: 21,
+  borderRadius: 24,
 
-      justifyContent:
-        "center",
+  justifyContent:
+    "center",
 
-      alignItems:
-        "center",
+  alignItems:
+    "center",
 
-      shadowColor:
-        "#000",
+  borderWidth: 2,
 
-      shadowOpacity: 0.24,
-
-      shadowRadius: 12,
-
-      elevation: 6,
-
-      borderWidth: 3,
-
-      borderColor:
-        "#FFFFFF",
-    },
+  borderColor:
+    "#FFFFFF",
+},
 
     locationButton: {
 

@@ -97,17 +97,30 @@ export default function CreateTaskScreen({
 
       try {
 
-        const result =
-          await ImagePicker.launchImageLibraryAsync({
+        const permission =
+  await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-            mediaTypes:
-              ImagePicker.MediaType.Images,
+if (!permission.granted) {
 
-            allowsEditing:
-              true,
+  Alert.alert(
+    "Tillatelse kreves",
+    "Gi appen tilgang til bilder."
+  );
 
-            quality: 0.7,
-          });
+  return;
+}
+
+const result =
+  await ImagePicker.launchImageLibraryAsync({
+
+    mediaTypes:
+      ImagePicker.MediaTypeOptions.Images,
+
+    allowsEditing:
+      true,
+
+    quality: 0.7,
+  });
 
         if (
           !result.canceled

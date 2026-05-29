@@ -103,12 +103,10 @@ export default function MessagesScreen({
                       const isMine =
 
                         task.ownerId ===
-                          auth.currentUser
-                            ?.uid ||
+                        auth.currentUser?.uid ||
 
-                        task.acceptedBy ===
-                          auth.currentUser
-                            ?.uid;
+                        task.acceptedById ===
+                        auth.currentUser?.uid;
 
                       if (!isMine)
                         return null;
@@ -196,28 +194,18 @@ export default function MessagesScreen({
 
   }, []);
 
-  // DELETE CHAT
+// DELETE CHAT
 
-  const deleteChat =
-    async (
-      taskId
-    ) => {
+const deleteChat =
+  async (
+    taskId
+  ) => {
 
-      try {
-
-        await deleteDoc(
-          doc(
-            db,
-            "tasks",
-            taskId
-          )
-        );
-
-      } catch (e) {
-
-        console.log(e);
-      }
-    };
+    Alert.alert(
+      "Kommer snart 🚀",
+      "Sletting av chatter kommer i en senere oppdatering."
+    );
+  };
 
   // LONG PRESS
 

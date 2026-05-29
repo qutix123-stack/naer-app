@@ -245,7 +245,7 @@ export default function ProfileScreen() {
           await ImagePicker.launchImageLibraryAsync(
             {
               mediaTypes:
-                ImagePicker.MediaType.Images,
+                ImagePicker.MediaTypeOptions.Images,
 
               allowsEditing:
                 true,

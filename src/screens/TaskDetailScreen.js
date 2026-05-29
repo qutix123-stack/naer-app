@@ -27,6 +27,7 @@ import {
   doc,
   getDoc,
   updateDoc,
+  deleteDoc,
 } from "firebase/firestore";
 
 import {
@@ -122,7 +123,10 @@ export default function TaskDetailScreen({
           {
             accepted: true,
 
-            acceptedBy:
+            acceptedByEmail:
+              auth.currentUser?.email || "",
+
+            acceptedById:
               auth.currentUser?.uid,
 
             acceptedByName:
@@ -140,10 +144,18 @@ export default function TaskDetailScreen({
         );
 
         Alert.alert(
-          "Oppdrag akseptert 🔥"
-        );
+  "Oppdrag akseptert 🔥"
+);
 
-        loadTask();
+navigation.navigate(
+  "Chat",
+  {
+    taskId:
+      task.id,
+  }
+);
+
+loadTask();
 
       } catch (e) {
 
@@ -223,6 +235,62 @@ export default function TaskDetailScreen({
       }
     };
 
+    const deleteTask =
+  async () => {
+
+    if (task?.accepted) {
+
+      Alert.alert(
+        "Kan ikke slette",
+        "Oppdraget er allerede akseptert."
+      );
+
+      return;
+    }
+
+    Alert.alert(
+      "Slett oppdrag",
+
+      "Er du sikker på at du vil slette oppdraget?",
+
+      [
+        {
+          text: "Avbryt",
+          style: "cancel",
+        },
+
+        {
+          text: "Slett",
+          style: "destructive",
+
+          onPress: async () => {
+
+            try {
+
+              await deleteDoc(
+                doc(
+                  db,
+                  "tasks",
+                  task.id
+                )
+              );
+
+              navigation.goBack();
+
+            } catch (e) {
+
+              console.log(e);
+
+              Alert.alert(
+                "Kunne ikke slette oppdrag"
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   // LOADING
 
   if (loading) {
@@ -281,7 +349,7 @@ export default function TaskDetailScreen({
       isOwner ||
 
       auth.currentUser?.uid ===
-      task?.acceptedBy
+      task?.acceptedById
     );
 
   return (
@@ -644,6 +712,43 @@ export default function TaskDetailScreen({
       </ScrollView>
 
       {/* CTA */}
+
+      {isOwner && !isAccepted && (
+
+  <TouchableOpacity
+    activeOpacity={0.92}
+
+    style={{
+      position: "absolute",
+      left: 20,
+      right: 20,
+      bottom: 110,
+
+      backgroundColor: "#EF4444",
+
+      borderRadius: 24,
+
+      paddingVertical: 18,
+
+      alignItems: "center",
+    }}
+
+    onPress={deleteTask}
+  >
+
+    <Text
+      style={{
+        color: "#FFFFFF",
+        fontSize: 16,
+        fontWeight: "800",
+      }}
+    >
+      Slett oppdrag
+    </Text>
+
+  </TouchableOpacity>
+
+)}
 
       {!isAccepted && (
 

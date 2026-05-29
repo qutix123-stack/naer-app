@@ -312,7 +312,7 @@ const addActivity =
             status:
               "open",
 
-            acceptedBy:
+            acceptedById:
               null,
 
             acceptedById:
@@ -418,7 +418,7 @@ const addActivity =
             status:
               "accepted",
 
-            acceptedBy:
+            acceptedById:
               helperName ||
               "Hjelper",
 
