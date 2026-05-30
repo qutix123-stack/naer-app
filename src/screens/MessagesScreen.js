@@ -13,6 +13,7 @@ import {
   TextInput,
   StyleSheet,
   Platform,
+  Image,
 } from "react-native";
 
 import {
@@ -21,6 +22,7 @@ import {
 
 import {
   collection,
+  getDocs,
   query,
   where,
   onSnapshot,
@@ -28,6 +30,8 @@ import {
   doc,
   orderBy,
   limit,
+  updateDoc,
+  arrayUnion,
 } from "firebase/firestore";
 
 import {
@@ -53,146 +57,222 @@ export default function MessagesScreen({
   // TEMP UNREAD STATE
 
   const hasUnread =
-    false;
+
+  chatTasks.some(
+    (task) =>
+
+      task?.lastMessage
+        ?.receiverId ===
+        auth.currentUser?.uid &&
+
+      task?.lastMessage
+        ?.read === false
+  );
 
   // LOAD CHATS
 
   useEffect(() => {
 
-    const q = query(
-      collection(
-        db,
-        "tasks"
-      ),
+  const q = query(
+    collection(
+      db,
+      "tasks"
+    ),
 
-      where(
-        "accepted",
-        "==",
-        true
+    where(
+      "accepted",
+      "==",
+      true
+    )
+  );
+
+  const unsubscribe =
+    onSnapshot(
+      q,
+
+      async (snapshot) => {
+
+        try {
+
+          const loaded =
+            await Promise.all(
+
+              snapshot.docs.map(
+                async (
+                  document
+                ) => {
+
+                  const task = {
+
+                    id:
+                      document.id,
+
+                    ...document.data(),
+                  };
+
+                  const isMine =
+
+                    task.ownerId ===
+                    auth.currentUser?.uid ||
+
+                    task.acceptedById ===
+                    auth.currentUser?.uid;
+
+                  if (!isMine)
+                    return null;
+
+                  if (
+
+                    task?.hiddenFor?.includes(
+                    auth.currentUser?.uid
+                      )
+
+                      )
+                      return null;
+
+                  const messagesSnapshot =
+                    await getDocs(
+
+                      query(
+
+                        collection(
+                          db,
+                          "tasks",
+                          task.id,
+                          "messages"
+                        ),
+
+                        orderBy(
+                          "createdAt",
+                          "desc"
+                        ),
+
+                        limit(1)
+                      )
+                    );
+
+                  let lastMessage =
+                    null;
+
+                  messagesSnapshot.forEach(
+                    (msg) => {
+
+                      lastMessage = {
+                        id:
+                          msg.id,
+
+                        ...msg.data(),
+                      };
+                    }
+                  );
+
+                  const otherUserId =
+
+  task.ownerId ===
+  auth.currentUser?.uid
+
+    ? task.acceptedById
+    : task.ownerId;
+
+let otherUserAvatar =
+  null;
+
+try {
+
+  const userDoc =
+    await getDocs(
+      query(
+        collection(
+          db,
+          "users"
+        ),
+
+        where(
+          "__name__",
+          "==",
+          otherUserId
+        )
       )
     );
 
-    const unsubscribe =
-      onSnapshot(
-        q,
+  userDoc.forEach(
+    (doc) => {
 
-        async (snapshot) => {
+      otherUserAvatar =
+        doc.data()
+          ?.avatar || null;
+    }
+  );
 
-          try {
+} catch (e) {}
 
-            const loaded =
-              await Promise.all(
+console.log(
+  "AVATAR:",
+  otherUserAvatar
+);
 
-                snapshot.docs
+return {
 
-                  .map(
-                    async (
-                      document
-                    ) => {
+  ...task,
 
-                      const task = {
+  lastMessage,
 
-                        id:
-                          document.id,
-
-                        ...document.data(),
-                      };
-
-                      // ONLY MY CHATS
-
-                      const isMine =
-
-                        task.ownerId ===
-                        auth.currentUser?.uid ||
-
-                        task.acceptedById ===
-                        auth.currentUser?.uid;
-
-                      if (!isMine)
-                        return null;
-
-                      // LOAD LAST MESSAGE
-
-                      const messagesQuery =
-                        query(
-
-                          collection(
-                            db,
-                            "tasks",
-                            task.id,
-                            "messages"
-                          ),
-
-                          orderBy(
-                            "createdAt",
-                            "desc"
-                          ),
-
-                          limit(1)
-                        );
-
-                      return new Promise(
-                        (
-                          resolve
-                        ) => {
-
-                          onSnapshot(
-                            messagesQuery,
-
-                            (
-                              messageSnapshot
-                            ) => {
-
-                              let lastMessage =
-                                null;
-
-                              messageSnapshot.forEach(
-                                (
-                                  msg
-                                ) => {
-
-                                  lastMessage =
-                                    msg.data();
-                                }
-                              );
-
-                              resolve({
-
-                                ...task,
-
-                                lastMessage,
-                              });
-                            }
-                          );
-                        }
-                      );
-                    }
-                  )
-              );
-
-            setChatTasks(
-
-              loaded.filter(
-                Boolean
+  otherUserAvatar,
+};
+                }
               )
             );
 
-          } catch (e) {
+          const filtered =
+            loaded
 
-            console.log(e);
+              .filter(
+                Boolean
+              )
 
-          } finally {
+              .sort(
+                (
+                  a,
+                  b
+                ) => {
 
-            setLoading(
-              false
-            );
-          }
+                  const aTime =
+                    a
+                      ?.lastMessage
+                      ?.createdAt
+                      ?.seconds || 0;
+
+                  const bTime =
+                    b
+                      ?.lastMessage
+                      ?.createdAt
+                      ?.seconds || 0;
+
+                  return (
+                    bTime -
+                    aTime
+                  );
+                }
+              );
+
+          setChatTasks(
+            filtered
+          );
+
+        } catch (e) {
+
+        } finally {
+
+          setLoading(
+            false
+          );
         }
-      );
+      }
+    );
 
-    return unsubscribe;
+  return unsubscribe;
 
-  }, []);
+}, []);
 
 // DELETE CHAT
 
@@ -201,10 +281,26 @@ const deleteChat =
     taskId
   ) => {
 
-    Alert.alert(
-      "Kommer snart 🚀",
-      "Sletting av chatter kommer i en senere oppdatering."
-    );
+    try {
+
+      await updateDoc(
+        doc(
+          db,
+          "tasks",
+          taskId
+        ),
+        {
+          hiddenFor:
+            arrayUnion(
+              auth.currentUser.uid
+            ),
+        }
+      );
+
+    } catch (e) {
+
+      console.log(e);
+    }
   };
 
   // LONG PRESS
@@ -341,14 +437,14 @@ const deleteChat =
 
           {/* BADGE */}
 
-          {hasUnread && (
+          {Boolean(hasUnread) === true && (
 
-            <View
-              style={
-                styles.headerDot
-              }
-            />
-          )}
+  <View
+    style={
+      styles.headerDot
+    }
+  />
+)}
 
         </TouchableOpacity>
 
@@ -455,9 +551,12 @@ const deleteChat =
             const isUnread =
 
               item?.lastMessage
-                ?.senderId !==
-                auth.currentUser
-                  ?.uid;
+                ?.receiverId ===
+                auth.currentUser?.uid &&
+
+              item?.lastMessage
+                ?.read === false;
+
 
             return (
 
@@ -466,17 +565,38 @@ const deleteChat =
                   0.9
                 }
 
-                onPress={() =>
+                onPress={() => {
 
-                  navigation.navigate(
-                    "Chat",
+                setChatTasks(
+                  (prev) =>
+                  prev.map(
+                  (task) =>
 
-                    {
-                      taskId:
-                        item.id,
-                    }
-                  )
-                }
+                  task.id ===
+                    item.id
+
+                    ? {
+                      ...task,
+
+                  lastMessage: {
+                  ...task.lastMessage,
+
+                  read: true,
+                },
+              }
+
+            : task
+      )
+  );
+
+  navigation.navigate(
+    "Chat",
+    {
+      taskId:
+        item.id,
+    }
+  );
+}}
 
                 onLongPress={() =>
                   handleLongPress(
@@ -492,24 +612,43 @@ const deleteChat =
                 {/* AVATAR */}
 
                 <View
-                  style={
-                    styles.avatar
-                  }
-                >
+  style={
+    styles.avatar
+  }
+>
 
-                  <Ionicons
-                    name="person"
-                    size={22}
-                    color="#111827"
-                  />
+  {item?.otherUserAvatar ? (
 
-                  <View
-                    style={
-                      styles.onlineDot
-                    }
-                  />
+    <Image
+      source={{
+        uri:
+          item.otherUserAvatar,
+      }}
 
-                </View>
+      style={{
+        width: "100%",
+        height: "100%",
+        borderRadius: 20,
+      }}
+    />
+
+  ) : (
+
+    <Ionicons
+      name="person"
+      size={22}
+      color="#111827"
+    />
+
+  )}
+
+  <View
+    style={
+      styles.onlineDot
+    }
+  />
+
+</View>
 
                 {/* CONTENT */}
 
@@ -534,8 +673,16 @@ const deleteChat =
                         1
                       }
                     >
-                      {item?.creatorName ||
-                        "Bruker"}
+                      {
+                        item.ownerId ===
+                        auth.currentUser?.uid
+
+                        ? item.acceptedByName ||
+                        "Hjelper"
+
+                        : item.creatorName ||
+                        "Bruker"
+                      }
                     </Text>
 
                     <Text
@@ -610,24 +757,24 @@ const deleteChat =
                   }
                 >
 
-                  {isUnread && (
+                  {Boolean(isUnread) === true && (
 
-                    <View
-                      style={
-                        styles.unreadBadge
-                      }
-                    >
+  <View
+    style={
+      styles.unreadBadge
+    }
+  >
 
-                      <Text
-                        style={
-                          styles.unreadText
-                        }
-                      >
-                        1
-                      </Text>
+    <Text
+      style={
+        styles.unreadText
+      }
+    >
+      1
+    </Text>
 
-                    </View>
-                  )}
+  </View>
+)}
 
                 </View>
 
@@ -662,12 +809,22 @@ const styles =
       paddingHorizontal: 20,
     },
 
+    avatarImage: {
+
+        width: 58,
+
+        height: 58,
+
+        borderRadius: 20,
+          },
+
     loadingContainer: {
 
       flex: 1,
 
       backgroundColor:
         "#F6F7FB",
+
 
       paddingTop:
         Platform.OS ===

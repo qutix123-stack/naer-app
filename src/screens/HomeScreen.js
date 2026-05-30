@@ -19,14 +19,16 @@ import {
   collection,
   onSnapshot,
   query,
-  orderBy,
 } from "firebase/firestore";
 
 import {
   Ionicons,
 } from "@expo/vector-icons";
 
-import { db } from "../firebaseConfig";
+import {
+  db,
+  auth,
+} from "../firebaseConfig";
 
 import TaskCard from "../components/TaskCard";
 
@@ -44,9 +46,6 @@ export default function HomeScreen({
     userLocation,
     setUserLocation,
   ] = useState(null);
-
-  const hasUnread =
-    false;
 
   const categories = [
 
@@ -182,45 +181,10 @@ export default function HomeScreen({
       }
     );
 
-  useEffect(() => {
-
-    getUserLocation();
-
-    const q = query(
-      collection(db, "tasks"),
-      orderBy("createdAt", "desc")
-    );
-
-    const unsubscribe =
-      onSnapshot(
-        q,
-
-        (snapshot) => {
-
-          const taskList =
-            [];
-
-          snapshot.forEach(
-            (doc) => {
-
-              taskList.push({
-                id:
-                  doc.id,
-
-                ...doc.data(),
-              });
-            }
-          );
-
-          setTasks(taskList);
-
-          setLoading(false);
-        }
-      );
-
-    return unsubscribe;
-
-  }, []);
+   const [
+  hasUnread,
+  setHasUnread,
+] = useState(false);
 
   // LOCATION
 
@@ -260,6 +224,112 @@ export default function HomeScreen({
         console.log(e);
       }
     };
+
+    // LOAD LICATION ON START
+    useEffect(() => {
+
+    getUserLocation();
+
+      }, []);
+
+      useEffect(() => {
+
+  const q = query(
+    collection(
+      db,
+      "tasks"
+    )
+  );
+
+  const unsubscribe =
+    onSnapshot(
+      q,
+
+      (snapshot) => {
+
+        const loaded =
+          [];
+
+        snapshot.forEach(
+          (doc) => {
+
+            const data =
+              doc.data();
+
+            if (
+              data.completed === true
+            )
+              return;
+
+            loaded.push({
+
+              id:
+                doc.id,
+
+              ...data,
+            });
+          }
+        );
+
+        setTasks(
+          loaded
+        );
+
+        setLoading(
+          false
+        );
+      }
+    );
+
+  return unsubscribe;
+
+}, []);
+
+      useEffect(() => {
+
+  const q = query(
+    collection(
+      db,
+      "tasks"
+    )
+  );
+
+  const unsubscribe =
+    onSnapshot(
+      q,
+
+      (snapshot) => {
+
+        let unread =
+          false;
+
+        snapshot.forEach(
+          (doc) => {
+
+            const data =
+              doc.data();
+
+            if (
+
+              data.hasUnreadFor ===
+              auth.currentUser?.uid
+
+            ) {
+
+              unread = true;
+            }
+          }
+        );
+
+        setHasUnread(
+          unread
+        );
+      }
+    );
+
+  return unsubscribe;
+
+}, []);
 
   // DISTANCE
 
@@ -474,17 +544,16 @@ export default function HomeScreen({
               color="#111827"
             />
 
-          </TouchableOpacity>
+            {hasUnread && (
 
-          {hasUnread && (
-
-            <View
-              style={
+              <View
+                style={
                 styles.notificationDot
-              }
-            />
-          )}
+                }
+                />
+            )}
 
+          </TouchableOpacity>
         </View>
 
       </View>
@@ -815,6 +884,25 @@ const styles =
 
           : 58,
     },
+
+    notificationDot: {
+
+  position:
+    "absolute",
+
+  top: 2,
+
+  right: 2,
+
+  width: 10,
+
+  height: 10,
+
+  borderRadius: 999,
+
+  backgroundColor:
+    "#EF4444",
+},
 
     header: {
 

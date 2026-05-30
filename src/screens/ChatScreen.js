@@ -33,7 +33,9 @@ import {
   serverTimestamp,
   doc,
   getDoc,
+  getDocs,
   setDoc,
+  updateDoc,
 } from "firebase/firestore";
 
 import {
@@ -77,6 +79,11 @@ export default function ChatScreen({
   const [otherUser, setOtherUser] =
     useState("Bruker");
 
+  const [
+  otherUserAvatar,
+  setOtherUserAvatar,
+] = useState(null);
+
   const [isTyping, setIsTyping] =
     useState(false);
 
@@ -97,9 +104,78 @@ export default function ChatScreen({
 
   // LOAD
 
+    const markMessagesAsRead =
+  async () => {
+
+    try {
+
+      const snapshot =
+        await getDocs(
+          collection(
+            db,
+            "tasks",
+            taskId,
+            "messages"
+          )
+        );
+
+      snapshot.forEach(
+        async (message) => {
+
+          const data =
+            message.data();
+
+
+          if (
+
+            data.receiverId ===
+            auth.currentUser?.uid &&
+
+            data.read === false
+
+          ) {
+
+            await updateDoc(
+
+              doc(
+                db,
+                "tasks",
+                taskId,
+                "messages",
+                message.id
+              ),
+
+              {
+                read: true,
+              }
+            );
+
+            await updateDoc(
+              doc(
+              db,
+              "tasks",
+              taskId
+                ),
+              {
+            hasUnreadFor:
+              null,
+              }
+            );
+
+          }
+        }
+      );
+
+    } catch (e) {
+
+      console.log(e);
+    }
+  };
+
   useEffect(() => {
 
     loadTask();
+    markMessagesAsRead();
 
     const q = query(
       collection(
@@ -139,6 +215,8 @@ export default function ChatScreen({
           setMessages(
             loaded
           );
+
+          markMessagesAsRead();
 
           setLoading(
             false
@@ -221,23 +299,53 @@ export default function ChatScreen({
 
         setTask(data);
 
-        if (
-          data.ownerId ===
-          auth.currentUser?.uid
-        ) {
+        let otherUserId = null;
 
-          setOtherUser(
-            data.acceptedByName ||
-            "Hjelper"
-          );
+if (
+  data.ownerId ===
+  auth.currentUser?.uid
+) {
 
-        } else {
+  setOtherUser(
+    data.acceptedByName ||
+    "Hjelper"
+  );
 
-          setOtherUser(
-            data.creatorName ||
-            "Bruker"
-          );
-        }
+  otherUserId =
+    data.acceptedById;
+
+} else {
+
+  setOtherUser(
+    data.creatorName ||
+    "Bruker"
+  );
+
+  otherUserId =
+    data.ownerId;
+}
+
+if (otherUserId) {
+
+  const userSnap =
+    await getDoc(
+      doc(
+        db,
+        "users",
+        otherUserId
+      )
+    );
+
+  if (
+    userSnap.exists()
+  ) {
+
+    setOtherUserAvatar(
+      userSnap.data()
+        ?.avatar || null
+    );
+  }
+}
 
       } catch (e) {
 
@@ -248,29 +356,41 @@ export default function ChatScreen({
   // PICK IMAGE
 
   const pickImage =
-    async () => {
+  async () => {
+
+    try {
 
       const result =
-        await ImagePicker.launchImageLibraryAsync({
+        await ImagePicker.launchImageLibraryAsync(
+          {
+            mediaTypes:
+              ImagePicker.MediaTypeOptions.Images,
 
-          mediaTypes:
-            ImagePicker.MediaType.Images,
+            allowsEditing:
+              true,
 
-          allowsEditing:
-            true,
-
-          quality: 0.7,
-        });
+            quality: 0.7,
+          }
+        );
 
       if (
-        !result.canceled
-      ) {
+        result.canceled
+      )
+        return;
 
-        setImage(
-          result.assets[0].uri
-        );
-      }
-    };
+      setImage(
+        result.assets[0]
+          .uri
+      );
+
+    } catch (e) {
+
+      console.log(
+        "IMAGE PICKER ERROR:",
+        e
+      );
+    }
+  };
 
   // SEND MESSAGE
 
@@ -339,43 +459,81 @@ export default function ChatScreen({
             await getDownloadURL(
               storageRef
             );
+
+            console.log(
+              "IMAGE URL:",
+              imageUrl
+            );
         }
 
         // SAVE MESSAGE
 
         await addDoc(
-          collection(
-            db,
-            "tasks",
-            taskId,
-            "messages"
+  collection(
+    db,
+    "tasks",
+    taskId,
+    "messages"
+  ),
+  {
+    text:
+      cleaned || "",
+
+    image:
+      imageUrl,
+
+    senderId:
+      auth.currentUser?.uid,
+
+    senderName:
+      auth.currentUser?.displayName ||
+      "Bruker",
+
+    receiverId:
+      task?.ownerId ===
+      auth.currentUser?.uid
+
+        ? task?.acceptedById
+        : task?.ownerId,
+
+    read: false,
+
+    createdAt:
+      serverTimestamp(),
+  }
+);
+
+await updateDoc(
+  doc(
+    db,
+    "tasks",
+    taskId
+  ),
+  {
+    hasUnreadFor:
+      task?.ownerId ===
+      auth.currentUser?.uid
+
+        ? task?.acceptedById
+        : task?.ownerId,
+  }
+);
+
+setText("");
+
+setImage(null);
+
+        await updateDoc(
+        doc(
+          db,
+          "tasks",
+          taskId
           ),
-
           {
-            text:
-              cleaned || "",
-
-            image:
-              imageUrl,
-
-            senderId:
-              auth.currentUser
-                ?.uid,
-
-            senderName:
-              auth.currentUser
-                ?.displayName ||
-
-              "Bruker",
-
-            createdAt:
-              serverTimestamp(),
+         lastMessageAt:
+        serverTimestamp(),
           }
         );
-
-        setText("");
-
-        setImage(null);
 
       } catch (e) {
 
@@ -613,28 +771,45 @@ export default function ChatScreen({
           >
 
             <View
-              style={
-                styles.headerAvatar
-              }
-            >
+  style={
+    styles.headerAvatar
+  }
+>
 
-              <Text
-                style={
-                  styles.headerAvatarText
-                }
-              >
-                {otherUser?.charAt(
-                  0
-                )}
-              </Text>
+  {otherUserAvatar ? (
 
-              <View
-                style={
-                  styles.onlineDot
-                }
-              />
+    <Image
+      source={{
+        uri:
+          otherUserAvatar,
+      }}
 
-            </View>
+      style={{
+        width: "100%",
+        height: "100%",
+        borderRadius: 18,
+      }}
+    />
+
+  ) : (
+
+    <Text
+      style={
+        styles.headerAvatarText
+      }
+    >
+      {otherUser?.charAt(0)}
+    </Text>
+
+  )}
+
+  <View
+    style={
+      styles.onlineDot
+    }
+  />
+
+</View>
 
             <View>
 

@@ -102,7 +102,6 @@ export default function ProfileScreen() {
   ] = useState(false);
 
   useEffect(() => {
-
     const fetchUser =
       async () => {
 
@@ -807,12 +806,137 @@ export default function ProfileScreen() {
 
       </View>
 
+      {/* SETTINGS */}
+
+            <View style={styles.settingsContainer}>
+
+  <TouchableOpacity
+    style={styles.settingItem}
+    onPress={() =>
+      setShowNameModal(true)
+    }
+  >
+    <Ionicons
+      name="person-outline"
+      size={22}
+      color="#111827"
+    />
+    <Text style={styles.settingText}>
+      Rediger profil
+    </Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={styles.settingItem}
+  >
+    <Ionicons
+      name="language-outline"
+      size={22}
+      color="#111827"
+    />
+    <Text style={styles.settingText}>
+      Språk
+    </Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={styles.settingItem}
+    onPress={() =>
+      setShowPasswordModal(true)
+    }
+  >
+    <Ionicons
+      name="lock-closed-outline"
+      size={22}
+      color="#111827"
+    />
+    <Text style={styles.settingText}>
+      Endre passord
+    </Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={styles.settingItem}
+    onPress={logout}
+  >
+    <Ionicons
+      name="log-out-outline"
+      size={22}
+      color="#EF4444"
+    />
+    <Text style={styles.logoutText}>
+      Logg ut
+    </Text>
+  </TouchableOpacity>
+
+  <TouchableOpacity
+    style={styles.settingItem}
+    onPress={removeAccount}
+  >
+    <Ionicons
+      name="trash-outline"
+      size={22}
+      color="#EF4444"
+    />
+    <Text style={styles.logoutText}>
+      Slett konto
+    </Text>
+  </TouchableOpacity>
+
+</View>
+
     </ScrollView>
   );
 }
 
 const styles =
   StyleSheet.create({
+
+    settingsContainer: {
+
+  marginHorizontal: 24,
+
+  backgroundColor: "#FFFFFF",
+
+  borderRadius: 28,
+
+  padding: 12,
+
+  marginBottom: 24,
+},
+
+settingItem: {
+
+  flexDirection: "row",
+
+  alignItems: "center",
+
+  paddingVertical: 18,
+
+  paddingHorizontal: 12,
+},
+
+settingText: {
+
+  marginLeft: 14,
+
+  fontSize: 16,
+
+  color: "#111827",
+
+  fontWeight: "600",
+},
+
+logoutText: {
+
+  marginLeft: 14,
+
+  fontSize: 16,
+
+  color: "#EF4444",
+
+  fontWeight: "700",
+},
 
     container: {
 
