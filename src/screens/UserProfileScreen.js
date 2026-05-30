@@ -64,7 +64,18 @@ import {
 
 import * as ImagePicker from "expo-image-picker";
 
-export default function ProfileScreen() {
+export default function UserProfileScreen({
+    route,
+    navigation,
+}) {
+
+const { userId } =
+  route.params;
+
+  console.log(
+  "USER PROFILE SCREEN",
+  userId
+);
 
   const [userData, setUserData] =
     useState(null);
@@ -120,7 +131,7 @@ export default function ProfileScreen() {
             doc(
               db,
               "users",
-              auth.currentUser.uid
+              userId
             );
 
           const userSnap =
@@ -171,7 +182,7 @@ export default function ProfileScreen() {
           doc(
             db,
             "users",
-            auth.currentUser.uid
+            userId
           ),
           {
             expoPushToken:
@@ -209,17 +220,17 @@ savePushToken();
       return;
 
     const q = query(
-  collection(
-    db,
-    "reviews"
-  ),
+      collection(
+        db,
+        "reviews"
+      ),
 
-  where(
-    "to",
-    "==",
-    auth.currentUser.uid
-  )
-)
+      where(
+        "to",
+        "==",
+        userId
+      )
+    );
 
     const unsubscribe =
       onSnapshot(
@@ -325,7 +336,7 @@ savePushToken();
           ref(
             storage,
 
-            `avatars/${auth.currentUser.uid}`
+            `avatars/${userId}`
           );
 
         await uploadBytes(
@@ -342,7 +353,7 @@ savePushToken();
           doc(
             db,
             "users",
-            auth.currentUser.uid
+            userId
           ),
 
           {
@@ -389,7 +400,7 @@ savePushToken();
           doc(
             db,
             "users",
-            auth.currentUser.uid
+            userId
           ),
 
           {
@@ -851,85 +862,7 @@ savePushToken();
 
       </View>
 
-      {/* SETTINGS */}
-
-            <View style={styles.settingsContainer}>
-
-  <TouchableOpacity
-    style={styles.settingItem}
-    onPress={() =>
-      setShowNameModal(true)
-    }
-  >
-    <Ionicons
-      name="person-outline"
-      size={22}
-      color="#111827"
-    />
-    <Text style={styles.settingText}>
-      Rediger profil
-    </Text>
-  </TouchableOpacity>
-
-  <TouchableOpacity
-    style={styles.settingItem}
-  >
-    <Ionicons
-      name="language-outline"
-      size={22}
-      color="#111827"
-    />
-    <Text style={styles.settingText}>
-      Språk
-    </Text>
-  </TouchableOpacity>
-
-  <TouchableOpacity
-    style={styles.settingItem}
-    onPress={() =>
-      setShowPasswordModal(true)
-    }
-  >
-    <Ionicons
-      name="lock-closed-outline"
-      size={22}
-      color="#111827"
-    />
-    <Text style={styles.settingText}>
-      Endre passord
-    </Text>
-  </TouchableOpacity>
-
-  <TouchableOpacity
-    style={styles.settingItem}
-    onPress={logout}
-  >
-    <Ionicons
-      name="log-out-outline"
-      size={22}
-      color="#EF4444"
-    />
-    <Text style={styles.logoutText}>
-      Logg ut
-    </Text>
-  </TouchableOpacity>
-
-  <TouchableOpacity
-    style={styles.settingItem}
-    onPress={removeAccount}
-  >
-    <Ionicons
-      name="trash-outline"
-      size={22}
-      color="#EF4444"
-    />
-    <Text style={styles.logoutText}>
-      Slett konto
-    </Text>
-  </TouchableOpacity>
-
-</View>
-
+      
 {/* REVIEWS */}
 
 <View

@@ -826,102 +826,117 @@ setImage(null);
         }}
       >
 
-        {/* HEADER */}
+    {/* HEADER */}
 
-        <View
-          style={
-            styles.header
-          }
-        >
-
-          <TouchableOpacity
-            onPress={() =>
-              navigation.goBack()
-            }
-          >
-
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color="#111827"
-            />
-
-          </TouchableOpacity>
-
-          <View
-            style={
-              styles.headerCenter
-            }
-          >
-
-            <View
+<View
   style={
-    styles.headerAvatar
+    styles.header
   }
 >
 
-  {otherUserAvatar ? (
+  <TouchableOpacity
+    onPress={() =>
+      navigation.goBack()
+    }
+  >
 
-    <Image
-      source={{
-        uri:
-          otherUserAvatar,
-      }}
-
-      style={{
-        width: "100%",
-        height: "100%",
-        borderRadius: 18,
-      }}
+    <Ionicons
+      name="arrow-back"
+      size={24}
+      color="#111827"
     />
 
-  ) : (
+  </TouchableOpacity>
 
-    <Text
+  <TouchableOpacity
+    style={
+      styles.headerCenter
+    }
+
+    activeOpacity={0.8}
+
+    onPress={() =>
+      navigation.navigate(
+        "UserProfile",
+        {
+          userId:
+
+            task?.ownerId ===
+            auth.currentUser?.uid
+
+              ? task?.acceptedById
+              : task?.ownerId,
+        }
+      )
+    }
+  >
+
+    <View
       style={
-        styles.headerAvatarText
+        styles.headerAvatar
       }
     >
-      {otherUser?.charAt(0)}
-    </Text>
 
-  )}
+      {otherUserAvatar ? (
 
-  <View
-    style={
-      styles.onlineDot
-    }
-  />
+        <Image
+          source={{
+            uri:
+              otherUserAvatar,
+          }}
+
+          style={{
+            width: "100%",
+            height: "100%",
+            borderRadius: 18,
+          }}
+        />
+
+      ) : (
+
+        <Text
+          style={
+            styles.headerAvatarText
+          }
+        >
+          {otherUser?.charAt(0)}
+        </Text>
+
+      )}
+
+      <View
+        style={
+          styles.onlineDot
+        }
+      />
+
+    </View>
+
+    <View>
+
+      <Text
+        style={
+          styles.headerName
+        }
+      >
+        {otherUser}
+      </Text>
+
+      <Text
+        style={
+          styles.headerTask
+        }
+
+        numberOfLines={1}
+      >
+        {task?.title}
+      </Text>
+
+    </View>
+
+  </TouchableOpacity>
 
 </View>
-
-            <View>
-
-              <Text
-                style={
-                  styles.headerName
-                }
-              >
-                {otherUser}
-              </Text>
-
-              <Text
-                style={
-                  styles.headerTask
-                }
-
-                numberOfLines={1}
-              >
-                {
-                  task?.title
-                }
-              </Text>
-
-            </View>
-
-          </View>
-
-        </View>
 
         {/* TYPING */}
 

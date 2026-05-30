@@ -3,6 +3,9 @@ import {
   useState,
 } from "react";
 
+import UserProfileScreen
+  from "./src/screens/UserProfileScreen";
+
 import {
   View,
   Platform,
@@ -467,7 +470,6 @@ export default function App() {
           >
 
             {user ? (
-
               <Stack.Screen
                 name="Tabs"
 
@@ -524,6 +526,14 @@ export default function App() {
 
               component={
                 ReviewScreen
+              }
+            />
+
+            <Stack.Screen
+              name="UserProfile"
+
+              component={
+                UserProfileScreen
               }
             />
 
