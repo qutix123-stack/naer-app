@@ -205,12 +205,12 @@ loadTask();
             taskTitle:
               task.title,
 
-            toUserEmail:
+            toUserId:
 
               auth.currentUser?.uid ===
               task.ownerId
 
-                ? task.acceptedByEmail
+                ? task.acceptedById
 
                 : task.creatorEmail,
 
