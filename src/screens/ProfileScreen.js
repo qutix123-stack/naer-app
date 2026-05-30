@@ -8,6 +8,10 @@ import {
   LinearGradient,
 } from "expo-linear-gradient";
 
+import {
+  registerForPushNotifications,
+} from "../services/notifications";
+
 import React, {
   useEffect,
   useState,
@@ -69,7 +73,7 @@ export default function ProfileScreen() {
     useState(false);
 
   const [reviews, setReviews] =
-    useState([]);
+  useState([]);
 
   const [averageRating, setAverageRating] =
     useState(5);
@@ -152,7 +156,48 @@ export default function ProfileScreen() {
 
     fetchUser();
 
+// PUSH
+      const savePushToken =
+  async () => {
+
+    try {
+
+      const token =
+        await registerForPushNotifications();
+
+      if (token) {
+
+        await setDoc(
+          doc(
+            db,
+            "users",
+            auth.currentUser.uid
+          ),
+          {
+            expoPushToken:
+              token,
+          },
+          {
+            merge: true,
+          }
+        );
+
+        console.log(
+          "PUSH TOKEN:",
+          token
+        );
+      }
+
+    } catch (e) {
+
+      console.log(e);
+    }
+  };
+
+savePushToken();
+
   }, []);
+
 
   // LOAD REVIEWS
 
@@ -882,6 +927,90 @@ export default function ProfileScreen() {
       Slett konto
     </Text>
   </TouchableOpacity>
+
+</View>
+
+{/* REVIEWS */}
+
+<View
+  style={{
+    marginHorizontal: 24,
+    marginBottom: 24,
+  }}
+>
+
+  <Text
+    style={{
+      fontSize: 22,
+      fontWeight: "800",
+      color: "#111827",
+      marginBottom: 16,
+    }}
+  >
+    Reviews
+  </Text>
+
+  {reviews.length === 0 ? (
+
+    <Text
+      style={{
+        color: "#6B7280",
+      }}
+    >
+      Ingen reviews enda
+    </Text>
+
+  ) : (
+
+    reviews.map(
+      (review) => (
+
+        <View
+          key={review.id}
+          style={{
+            backgroundColor:
+              "#FFFFFF",
+
+            borderRadius: 24,
+
+            padding: 18,
+
+            marginBottom: 12,
+          }}
+        >
+
+          <Text
+            style={{
+              fontWeight: "700",
+              marginBottom: 8,
+            }}
+          >
+            ⭐ {review.rating}
+          </Text>
+
+          <Text
+            style={{
+              color: "#374151",
+              marginBottom: 10,
+            }}
+          >
+            {review.text}
+          </Text>
+
+          <Text
+            style={{
+              color: "#6B7280",
+              fontSize: 13,
+            }}
+          >
+            - {review.fromName}
+          </Text>
+
+        </View>
+      )
+    )
+
+  )}
 
 </View>
 

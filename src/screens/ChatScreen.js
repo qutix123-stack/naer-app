@@ -7,6 +7,10 @@ import React, {
 import * as ImagePicker from "expo-image-picker";
 
 import {
+  sendPushNotification,
+} from "../services/sendPush";
+
+import {
   View,
   Text,
   StyleSheet,
@@ -18,6 +22,7 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Image,
+  Modal,
 } from "react-native";
 
 import {
@@ -61,8 +66,18 @@ export default function ChatScreen({
   const [messages, setMessages] =
     useState([]);
 
+  const [
+  selectedImage,
+  setSelectedImage,
+] = useState(null);
+
   const [text, setText] =
     useState("");
+
+  const [
+  myAvatar,
+  setMyAvatar,
+] = useState(null);
 
   const [loading, setLoading] =
     useState(true);
@@ -299,6 +314,26 @@ export default function ChatScreen({
 
         setTask(data);
 
+        const myUserSnap =
+  await getDoc(
+    doc(
+      db,
+      "users",
+      auth.currentUser.uid
+    )
+  );
+
+  if (
+  myUserSnap.exists()
+) {
+
+  setMyAvatar(
+    myUserSnap.data()
+      ?.avatar || null
+  );
+}
+
+
         let otherUserId = null;
 
 if (
@@ -365,9 +400,6 @@ if (otherUserId) {
           {
             mediaTypes:
               ImagePicker.MediaTypeOptions.Images,
-
-            allowsEditing:
-              true,
 
             quality: 0.7,
           }
@@ -489,6 +521,9 @@ if (otherUserId) {
       auth.currentUser?.displayName ||
       "Bruker",
 
+    senderPhoto:
+      myAvatar,
+
     receiverId:
       task?.ownerId ===
       auth.currentUser?.uid
@@ -502,6 +537,45 @@ if (otherUserId) {
       serverTimestamp(),
   }
 );
+
+// Send PUSH
+const receiverId =
+
+  task?.ownerId ===
+  auth.currentUser?.uid
+
+    ? task?.acceptedById
+    : task?.ownerId;
+
+const receiverSnap =
+  await getDoc(
+    doc(
+      db,
+      "users",
+      receiverId
+    )
+  );
+
+const pushToken =
+  receiverSnap.data()
+    ?.expoPushToken;
+
+if (pushToken) {
+
+  await sendPushNotification(
+
+    pushToken,
+
+    auth.currentUser
+      ?.displayName ||
+
+      "Ny melding",
+
+    cleaned
+      ? cleaned
+      : "📷 Bilde"
+  );
+}
 
 await updateDoc(
   doc(
@@ -661,17 +735,27 @@ setImage(null);
 
             {item.image && (
 
-              <Image
-                source={{
-                  uri:
-                    item.image,
-                }}
+  <TouchableOpacity
+    onPress={() =>
+      setSelectedImage(
+        item.image
+      )
+    }
+  >
 
-                style={
-                  styles.messageImage
-                }
-              />
-            )}
+    <Image
+      source={{
+        uri:
+          item.image,
+      }}
+
+      style={
+        styles.messageImage
+      }
+    />
+
+  </TouchableOpacity>
+)}
 
             <Text
               style={[
@@ -1071,6 +1155,76 @@ setImage(null);
         </View>
 
       </KeyboardAvoidingView>
+
+            {selectedImage && (
+
+        <Modal
+          transparent
+          visible
+        >
+
+          <View
+            style={{
+              flex: 1,
+              backgroundColor:
+                "black",
+              justifyContent:
+                "center",
+            }}
+          >
+
+            <TouchableOpacity
+  onPress={() =>
+    setSelectedImage(null)
+  }
+
+  style={{
+    position: "absolute",
+    top: 60,
+    right: 20,
+    zIndex: 999,
+
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+
+    backgroundColor:
+      "rgba(17,24,39,0.85)",
+
+    justifyContent:
+      "center",
+
+    alignItems:
+      "center",
+  }}
+>
+
+  <Ionicons
+    name="close"
+    size={24}
+    color="#FFFFFF"
+  />
+
+</TouchableOpacity>
+
+            <Image
+              source={{
+                uri:
+                  selectedImage,
+              }}
+
+              resizeMode="contain"
+
+              style={{
+                width: "100%",
+                height: "100%",
+              }}
+            />
+
+          </View>
+
+        </Modal>
+      )}
 
     </SafeAreaView>
   );

@@ -215,7 +215,7 @@ loadTask();
 
                 ? task.acceptedById
 
-                : task.creatorEmail,
+                : task.ownerId,
 
             toUserName:
 
