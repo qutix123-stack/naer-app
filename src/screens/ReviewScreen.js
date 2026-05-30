@@ -39,7 +39,7 @@ export default function ReviewScreen({
   const {
     taskId,
     taskTitle,
-    toUserEmail,
+    toUserId,
     toUserName,
   } = route.params;
 
@@ -61,7 +61,29 @@ export default function ReviewScreen({
 
         setLoading(true);
 
+        if (!toUserId) {
+
+            Alert.alert(
+              "Feil",
+              "Fant ikke bruker å sende review til."
+          );
+
+        setLoading(false);
+
+        return;
+      }
+
         // SAVE REVIEW
+
+        console.log(
+          "toUserId:",
+            toUserId
+          );
+
+        console.log(
+          "toUserName:",
+            toUserName
+          );
 
         await addDoc(
           collection(
@@ -75,7 +97,7 @@ export default function ReviewScreen({
             taskTitle,
 
             to:
-              toUserEmail,
+              toUserId,
 
             from:
               auth.currentUser
@@ -104,7 +126,7 @@ export default function ReviewScreen({
             db,
             "users",
 
-            toUserEmail
+            toUserId
           );
 
         const userSnap =

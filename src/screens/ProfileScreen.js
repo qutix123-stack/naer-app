@@ -173,7 +173,7 @@ export default function ProfileScreen() {
       where(
         "to",
         "==",
-        auth.currentUser.email
+        auth.currentUser.uid
       )
     );
 

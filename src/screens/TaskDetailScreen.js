@@ -195,6 +195,9 @@ loadTask();
           }
         );
 
+        console.log("TASK DATA:");
+        console.log(task);
+
         navigation.navigate(
           "Review",
 
