@@ -96,6 +96,11 @@ export default function ProfileScreen() {
   ] = useState("");
 
   const [
+  showEditModal,
+  setShowEditModal,
+] = useState(false);
+
+  const [
     showNameModal,
     setShowNameModal,
   ] = useState(false);
@@ -545,7 +550,97 @@ savePushToken();
       );
     };
 
+    const completed =
+  userData?.completedTasks || 0;
+
+let helperLevel =
+  "🌱 Rookie";
+
+if (completed >= 50) {
+
+  helperLevel =
+    "👑 Elite";
+
+} else if (
+  completed >= 30
+) {
+
+  helperLevel =
+    "🔥 Pro";
+
+} else if (
+  completed >= 15
+) {
+
+  helperLevel =
+    "⭐ Trusted";
+
+} else if (
+  completed >= 5
+) {
+
+  helperLevel =
+    "🚀 Helper";
+}
+
+let progress = 0;
+
+if (completed >= 50) {
+
+  progress = 100;
+
+} else if (completed >= 30) {
+
+  progress =
+    ((completed - 30) / 20) * 100;
+
+} else if (completed >= 15) {
+
+  progress =
+    ((completed - 15) / 15) * 100;
+
+} else if (completed >= 5) {
+
+  progress =
+    ((completed - 5) / 10) * 100;
+
+} else {
+
+  progress =
+    (completed / 5) * 100;
+}
+
+let nextLevelTarget = 5;
+
+if (completed >= 50) {
+
+  nextLevelTarget = 50;
+
+} else if (completed >= 30) {
+
+  nextLevelTarget = 50;
+
+} else if (completed >= 15) {
+
+  nextLevelTarget = 30;
+
+} else if (completed >= 5) {
+
+  nextLevelTarget = 15;
+}
+
+const remaining =
+  Math.max(
+    0,
+    nextLevelTarget - completed
+  );
+
+  const isVerified =
+  completed >= 5;
+
   return (
+
+    <>
 
     <ScrollView
       style={
@@ -616,19 +711,23 @@ savePushToken();
 
           {/* VERIFIED */}
 
-          <View
-            style={
-              styles.verifiedBadge
-            }
-          >
+          {isVerified && (
 
-            <Ionicons
-              name="checkmark"
-              size={14}
-              color="#FFFFFF"
-            />
+  <View
+    style={
+      styles.verifiedBadge
+    }
+  >
 
-          </View>
+    <Ionicons
+      name="checkmark"
+      size={14}
+      color="#FFFFFF"
+    />
+
+  </View>
+
+)}
 
         </TouchableOpacity>
 
@@ -674,10 +773,22 @@ savePushToken();
           >
 
             <Ionicons
-              name="shield-checkmark"
-              size={26}
-              color="#2563EB"
-            />
+  name={
+    isVerified
+
+      ? "shield-checkmark"
+      : "shield-outline"
+  }
+
+  size={26}
+
+  color={
+    isVerified
+
+      ? "#2563EB"
+      : "#9CA3AF"
+  }
+/>
 
           </View>
 
@@ -688,20 +799,28 @@ savePushToken();
           >
 
             <Text
-              style={
-                styles.trustTitle
-              }
-            >
-              Verifisert bruker
-            </Text>
+  style={
+    styles.trustTitle
+  }
+>
+  {isVerified
+
+    ? "Verifisert bruker"
+
+    : "Ikke verifisert"}
+</Text>
 
             <Text
-              style={
-                styles.trustSubtitle
-              }
-            >
-              Trygg og aktiv hjelper 😄
-            </Text>
+  style={
+    styles.trustSubtitle
+  }
+>
+  {isVerified
+
+    ? "Trygg og aktiv hjelper 😄"
+
+    : "Fullfør 5 oppdrag for verifisering"}
+</Text>
 
           </View>
 
@@ -729,10 +848,10 @@ savePushToken();
 
             <Text
               style={
-                styles.levelBadge
+              styles.levelBadge
               }
             >
-              🔥 Pro
+              {helperLevel}
             </Text>
 
           </View>
@@ -744,21 +863,28 @@ savePushToken();
           >
 
             <View
-              style={
-                styles.levelProgress
-              }
-            />
+  style={[
+    styles.levelProgress,
+    {
+      width: `${progress}%`,
+    },
+  ]}
+/>
 
           </View>
 
           <Text
-            style={
-              styles.levelText
-            }
-          >
-            {userData?.completedTasks || 0}
-            /50 oppdrag fullført
-          </Text>
+  style={
+    styles.levelText
+  }
+>
+  {completed >= 50
+
+    ? "Maks nivå nådd 👑"
+
+    : `${remaining} oppdrag til neste nivå`
+  }
+</Text>
 
         </View>
 
@@ -858,7 +984,7 @@ savePushToken();
   <TouchableOpacity
     style={styles.settingItem}
     onPress={() =>
-      setShowNameModal(true)
+      setShowEditModal(true)
     }
   >
     <Ionicons
@@ -871,34 +997,6 @@ savePushToken();
     </Text>
   </TouchableOpacity>
 
-  <TouchableOpacity
-    style={styles.settingItem}
-  >
-    <Ionicons
-      name="language-outline"
-      size={22}
-      color="#111827"
-    />
-    <Text style={styles.settingText}>
-      Språk
-    </Text>
-  </TouchableOpacity>
-
-  <TouchableOpacity
-    style={styles.settingItem}
-    onPress={() =>
-      setShowPasswordModal(true)
-    }
-  >
-    <Ionicons
-      name="lock-closed-outline"
-      size={22}
-      color="#111827"
-    />
-    <Text style={styles.settingText}>
-      Endre passord
-    </Text>
-  </TouchableOpacity>
 
   <TouchableOpacity
     style={styles.settingItem}
@@ -1014,8 +1112,169 @@ savePushToken();
 
 </View>
 
-    </ScrollView>
-  );
+</ScrollView>
+
+<Modal
+  visible={showEditModal}
+  transparent
+  animationType="fade"
+>
+
+  <View
+    style={{
+      flex: 1,
+      backgroundColor:
+        "rgba(0,0,0,0.4)",
+      justifyContent:
+        "center",
+      padding: 24,
+    }}
+  >
+
+    <View
+      style={{
+        backgroundColor:
+          "#FFFFFF",
+        borderRadius: 28,
+        padding: 24,
+      }}
+    >
+
+      <Text
+        style={{
+          fontSize: 22,
+          fontWeight: "800",
+          marginBottom: 20,
+        }}
+      >
+        Rediger profil
+      </Text>
+
+      <TouchableOpacity
+  style={styles.settingItem}
+  onPress={() => {
+
+    setShowEditModal(false);
+    setShowNameModal(true);
+
+  }}
+>
+
+  <Ionicons
+    name="create-outline"
+    size={22}
+    color="#111827"
+  />
+
+  <Text
+    style={styles.settingText}
+  >
+    Navn og bio
+  </Text>
+
+</TouchableOpacity>
+
+      <TouchableOpacity
+  style={styles.settingItem}
+  onPress={() => {
+
+    setShowEditModal(false);
+    pickImage();
+
+  }}
+>
+
+  <Ionicons
+    name="camera-outline"
+    size={22}
+    color="#111827"
+  />
+
+  <Text
+    style={styles.settingText}
+  >
+    Profilbilde
+  </Text>
+
+</TouchableOpacity>
+
+      <TouchableOpacity
+  style={styles.settingItem}
+  onPress={() => {
+
+    setShowEditModal(false);
+    setShowPasswordModal(true);
+
+  }}
+>
+
+  <Ionicons
+    name="lock-closed-outline"
+    size={22}
+    color="#111827"
+  />
+
+  <Text
+    style={styles.settingText}
+  >
+    Endre passord
+  </Text>
+
+</TouchableOpacity>
+
+      <TouchableOpacity
+  style={styles.settingItem}
+  onPress={() => {
+
+    Alert.alert(
+      "Språk",
+      "Kommer snart 🌍"
+    );
+
+  }}
+>
+
+  <Ionicons
+    name="language-outline"
+    size={22}
+    color="#111827"
+  />
+
+  <Text
+    style={styles.settingText}
+  >
+    Språk
+  </Text>
+
+</TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() =>
+          setShowEditModal(false)
+        }
+      >
+
+        <Text
+          style={{
+            textAlign: "center",
+            marginTop: 12,
+            color: "#6B7280",
+            fontWeight: "700",
+          }}
+        >
+          Avbryt
+        </Text>
+
+      </TouchableOpacity>
+
+    </View>
+
+  </View>
+
+</Modal>
+
+</>
+);
 }
 
 const styles =

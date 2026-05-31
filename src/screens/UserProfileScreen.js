@@ -1,10 +1,4 @@
 import {
-  ref,
-  uploadBytes,
-  getDownloadURL,
-} from "firebase/storage";
-
-import {
   LinearGradient,
 } from "expo-linear-gradient";
 
@@ -40,17 +34,7 @@ import {
 import {
   auth,
   db,
-  storage,
 } from "../firebaseConfig";
-
-import {
-  signOut,
-  updatePassword,
-  deleteUser,
-  updateProfile,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
-} from "firebase/auth";
 
 import {
   doc,
@@ -62,15 +46,15 @@ import {
   onSnapshot,
 } from "firebase/firestore";
 
-import * as ImagePicker from "expo-image-picker";
-
 export default function UserProfileScreen({
     route,
     navigation,
 }) {
 
-const { userId } =
-  route.params;
+const {
+  userId,
+  taskId,
+} = route.params;
 
   console.log(
   "USER PROFILE SCREEN",
@@ -167,46 +151,6 @@ const { userId } =
 
     fetchUser();
 
-// PUSH
-      const savePushToken =
-  async () => {
-
-    try {
-
-      const token =
-        await registerForPushNotifications();
-
-      if (token) {
-
-        await setDoc(
-          doc(
-            db,
-            "users",
-            userId
-          ),
-          {
-            expoPushToken:
-              token,
-          },
-          {
-            merge: true,
-          }
-        );
-
-        console.log(
-          "PUSH TOKEN:",
-          token
-        );
-      }
-
-    } catch (e) {
-
-      console.log(e);
-    }
-  };
-
-savePushToken();
-
   }, []);
 
 
@@ -289,273 +233,6 @@ savePushToken();
 
   }, []);
 
-  // PICK IMAGE
-
-  const pickImage =
-    async () => {
-
-      try {
-
-        const result =
-          await ImagePicker.launchImageLibraryAsync(
-            {
-              mediaTypes:
-                ImagePicker.MediaTypeOptions.Images,
-
-              allowsEditing:
-                true,
-
-              aspect: [1, 1],
-
-              quality: 0.7,
-            }
-          );
-
-        if (
-          result.canceled
-        )
-          return;
-
-        setLoading(true);
-
-        const uri =
-          result.assets[0]
-            .uri;
-
-        setImage(uri);
-
-        const response =
-          await fetch(
-            uri
-          );
-
-        const blob =
-          await response.blob();
-
-        const storageRef =
-          ref(
-            storage,
-
-            `avatars/${userId}`
-          );
-
-        await uploadBytes(
-          storageRef,
-          blob
-        );
-
-        const downloadURL =
-          await getDownloadURL(
-            storageRef
-          );
-
-        await setDoc(
-          doc(
-            db,
-            "users",
-            userId
-          ),
-
-          {
-            avatar:
-              downloadURL,
-          },
-
-          {
-            merge: true,
-          }
-        );
-
-        setUserData({
-          ...userData,
-
-          avatar:
-            downloadURL,
-        });
-
-        Alert.alert(
-          "Profilbilde oppdatert 😄"
-        );
-
-      } catch (e) {
-
-        console.log(e);
-
-      } finally {
-
-        setLoading(false);
-      }
-    };
-
-  // SAVE PROFILE
-
-  const saveProfile =
-    async () => {
-
-      try {
-
-        Keyboard.dismiss();
-
-        await setDoc(
-          doc(
-            db,
-            "users",
-            userId
-          ),
-
-          {
-            name:
-              newName.trim(),
-
-            bio:
-              newBio.trim(),
-          },
-
-          {
-            merge: true,
-          }
-        );
-
-        await updateProfile(
-          auth.currentUser,
-
-          {
-            displayName:
-              newName.trim(),
-          }
-        );
-
-        setUserData({
-          ...userData,
-
-          name:
-            newName,
-
-          bio:
-            newBio,
-        });
-
-        setShowNameModal(
-          false
-        );
-
-      } catch (e) {
-
-        console.log(e);
-      }
-    };
-
-  // CHANGE PASSWORD
-
-  const changePassword =
-    async () => {
-
-      try {
-
-        const credential =
-          EmailAuthProvider.credential(
-
-            auth.currentUser.email,
-
-            currentPassword
-          );
-
-        await reauthenticateWithCredential(
-          auth.currentUser,
-          credential
-        );
-
-        await updatePassword(
-          auth.currentUser,
-          newPassword
-        );
-
-        Alert.alert(
-          "Passord oppdatert 😄"
-        );
-
-        setShowPasswordModal(
-          false
-        );
-
-      } catch (e) {
-
-        console.log(e);
-
-        Alert.alert(
-          "Feil passord"
-        );
-      }
-    };
-
-  // LOGOUT
-
-  const logout =
-    async () => {
-
-      try {
-
-        setLoading(true);
-
-        await signOut(
-          auth
-        );
-
-      } catch (e) {
-
-        console.log(e);
-
-      } finally {
-
-        setLoading(false);
-      }
-    };
-
-  // DELETE ACCOUNT
-
-  const removeAccount =
-    () => {
-
-      Alert.alert(
-        "Slett bruker",
-
-        "Er du sikker?",
-
-        [
-          {
-            text:
-              "Avbryt",
-
-            style:
-              "cancel",
-          },
-
-          {
-            text:
-              "Slett",
-
-            style:
-              "destructive",
-
-            onPress:
-              async () => {
-
-                try {
-
-                  await deleteUser(
-                    auth.currentUser
-                  );
-
-                } catch (e) {
-
-                  console.log(e);
-                }
-              },
-          },
-        ]
-      );
-    };
-
   return (
 
     <ScrollView
@@ -572,6 +249,52 @@ savePushToken();
       }
     >
 
+      <View
+  style={{
+    position: "absolute",
+    top:
+      Platform.OS === "android"
+        ? 55
+        : 65,
+
+    left: 20,
+
+    zIndex: 999,
+  }}
+>
+
+  <TouchableOpacity
+    onPress={() =>
+      navigation.goBack()
+    }
+
+    style={{
+      width: 44,
+      height: 44,
+
+      borderRadius: 22,
+
+      backgroundColor:
+        "rgba(17,24,39,0.85)",
+
+      justifyContent:
+        "center",
+
+      alignItems:
+        "center",
+    }}
+  >
+
+    <Ionicons
+      name="arrow-back"
+      size={22}
+      color="#FFFFFF"
+    />
+
+  </TouchableOpacity>
+
+</View>
+
       {/* HERO */}
 
       <LinearGradient
@@ -586,63 +309,41 @@ savePushToken();
         }
       >
 
-        <TouchableOpacity
-          onPress={
-            pickImage
-          }
+        
+<View>
 
-          activeOpacity={
-            0.8
-          }
-        >
+  <Image
+    source={{
+      uri:
+        image ||
 
-          <Image
-            source={{
-              uri:
-                image ||
+        userData?.avatar ||
 
-                userData?.avatar ||
+        "https://i.pravatar.cc/300",
+    }}
 
-                "https://i.pravatar.cc/300",
-            }}
+    style={
+      styles.avatar
+    }
+  />
 
-            style={
-              styles.avatar
-            }
-          />
+  {/* VERIFIED */}
 
-          <View
-            style={
-              styles.editAvatar
-            }
-          >
+  <View
+    style={
+      styles.verifiedBadge
+    }
+  >
 
-            <Ionicons
-              name="camera"
-              size={18}
-              color="#FFFFFF"
-            />
+    <Ionicons
+      name="checkmark"
+      size={14}
+      color="#FFFFFF"
+    />
 
-          </View>
+  </View>
 
-          {/* VERIFIED */}
-
-          <View
-            style={
-              styles.verifiedBadge
-            }
-          >
-
-            <Ionicons
-              name="checkmark"
-              size={14}
-              color="#FFFFFF"
-            />
-
-          </View>
-
-        </TouchableOpacity>
-
+</View>
         <Text
           style={
             styles.name
@@ -661,6 +362,56 @@ savePushToken();
 
             "Hjelper folk i nærheten 😄"}
         </Text>
+
+        <TouchableOpacity
+  onPress={() => {
+
+  console.log(
+    "TASK ID:",
+    taskId
+  );
+
+  navigation.navigate(
+    "Chat",
+    {
+      taskId,
+    }
+  );
+}}
+
+  style={{
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+
+    backgroundColor: "#FFFFFF",
+
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+
+    borderRadius: 18,
+
+    marginTop: 18,
+  }}
+>
+
+  <Ionicons
+    name="chatbubble-ellipses"
+    size={20}
+    color="#2563EB"
+  />
+
+  <Text
+    style={{
+      marginLeft: 8,
+      fontWeight: "700",
+      color: "#2563EB",
+    }}
+  >
+    Åpne chat
+  </Text>
+
+</TouchableOpacity>
 
       </LinearGradient>
 
@@ -1042,31 +793,6 @@ logoutText: {
 
       borderColor:
         "#FFFFFF",
-    },
-
-    editAvatar: {
-
-      width: 38,
-
-      height: 38,
-
-      borderRadius: 19,
-
-      backgroundColor:
-        "#111827",
-
-      justifyContent:
-        "center",
-
-      alignItems:
-        "center",
-
-      position:
-        "absolute",
-
-      bottom: 0,
-
-      right: 0,
     },
 
     verifiedBadge: {

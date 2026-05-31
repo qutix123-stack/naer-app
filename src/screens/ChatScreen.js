@@ -312,7 +312,10 @@ export default function ChatScreen({
         if (!data)
           return;
 
-        setTask(data);
+        setTask({
+  id: snap.id,
+  ...data,
+});
 
         const myUserSnap =
   await getDoc(
@@ -860,12 +863,14 @@ setImage(null);
         "UserProfile",
         {
           userId:
+           task?.ownerId ===
+          auth.currentUser?.uid
 
-            task?.ownerId ===
-            auth.currentUser?.uid
+        ? task?.acceptedById
+        : task?.ownerId,
 
-              ? task?.acceptedById
-              : task?.ownerId,
+          taskId:
+          task?.id,
         }
       )
     }
